@@ -35,7 +35,25 @@ async function main() {
     await send('Page.navigate', { url: pathToFileURL(file).href });
     await until(() => { if (errors.length) throw new Error(errors.join('\n')); return evaluate('window.sent?.some(m=>m.action==="ready")'); }, 'dashboard ready');
     const post = async (value) => evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify({ type: 'snapshot', model: dashboardModel(value) })}}))`);
+    const axisLabels = () => evaluate('Array.from(document.querySelectorAll("#chart [data-axis=memory]"),el=>el.textContent)');
+    const assertAxisVisible = async () => {
+      assert.ok(await evaluate(`(()=>{
+        const svg=document.getElementById('chart'), bounds=svg.getBoundingClientRect();
+        const labels=[...svg.querySelectorAll('[data-axis=memory]')];
+        return labels.length>=2 && labels.every(el=>{
+          const r=el.getBoundingClientRect();
+          return r.left>=bounds.left && r.right<=bounds.right && r.top>=bounds.top && r.bottom<=bounds.bottom && r.height>=10;
+        }) && labels.every((el,i)=>i===0 || el.getBoundingClientRect().bottom<labels[i-1].getBoundingClientRect().top);
+      })()`), 'Gio labels stay readable, inside the chart and separate from one another.');
+    };
     await post(snapshot);
+    assert.deepEqual(await axisLabels(), ['0 Gio', '4 Gio', '8 Gio', '12 Gio', '16 Gio']);
+    await assertAxisVisible();
+    assert.ok(await evaluate(`(()=>{
+      const tick=[...document.querySelectorAll('#chart [data-axis=memory]')].find(el=>el.textContent==='8 Gio');
+      const threshold=document.querySelector('#chart [data-profile=development][stroke-dasharray="10 5"]');
+      return Number(tick.getAttribute('y'))===Number(threshold.getAttribute('y1'));
+    })()`), 'Thresholds and Gio ticks use the same scale.');
     assert.equal(await evaluate('document.querySelectorAll("#inventory tr:not(:has(.group))").length'), 3);
     assert.equal(await evaluate('document.querySelectorAll("#inventory .group").length'), 2);
     assert.equal(await evaluate('document.querySelectorAll("#chart polyline").length'), 4, 'Both memory traces retain explicit collection gaps.');
@@ -43,7 +61,20 @@ async function main() {
     assert.ok(await evaluate('document.getElementById("chart-legend").textContent.includes("tests · terminal · high 12 GiB")'));
     await evaluate('document.getElementById("show-profiles").click()');
     assert.equal(await evaluate('document.querySelectorAll("#chart [data-profile]").length'), 0);
+    assert.deepEqual(await axisLabels(), ['0 Gio', '0.5 Gio', '1 Gio', '1.5 Gio', '2 Gio']);
+    for (const bytes of [0, 0.375 * GiB, 32 * GiB]) {
+      await post({ ...snapshot, history: [], processes: [{ ...processes[0], privateBytes: bytes, workingSetBytes: bytes / 2 }] });
+      const labels = await axisLabels();
+      assert.equal(labels[0], '0 Gio');
+      assert.ok(Number.parseFloat(labels.at(-1)) >= bytes / GiB);
+      assert.ok(labels.length >= 2 && labels.length <= 6);
+      await assertAxisVisible();
+    }
+    await post({ ...snapshot, processes: [], history: [] });
+    assert.deepEqual(await axisLabels(), []);
+    await post(snapshot);
     await evaluate('document.getElementById("show-profiles").click();');
+    checks.push('Gio axis covers zero, fractional and large memory values, rescales without profiles and aligns thresholds with ticks.');
     assert.deepEqual(await evaluate('Array.from(document.getElementById("live-interval").options,o=>Number(o.value))'), [0, 250, 500, 1000, 2000, 5000]);
     assert.equal(await evaluate('document.querySelector("#live-controls label[for=live-interval]").textContent'), 'Refresh interval');
     assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("off")'));
@@ -68,6 +99,8 @@ async function main() {
     await evaluate('document.getElementById("kind").value="";document.getElementById("kind").dispatchEvent(new Event("change"));');
     await fs.writeFile(path.join(directory, 'desktop.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));
     await send('Emulation.setDeviceMetricsOverride', { width: 340, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await until(() => evaluate('Math.abs(document.getElementById("chart").viewBox.baseVal.width-document.getElementById("chart").clientWidth)<1'), 'responsive chart scale');
+    await assertAxisVisible();
     assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
     assert.ok(await evaluate('(()=>{const r=document.getElementById("live-interval").getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()'), 'Refresh interval is visible in the initial 340px sidebar viewport.');
     await fs.writeFile(path.join(directory, 'sidebar.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));

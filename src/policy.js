@@ -92,7 +92,13 @@ class PolicyEngine {
   }
 
   suspend(until) { this.suspendUntil = until; this.resetSeries(); }
-  resume() { this.suspendUntil = 0; this.suspendedReason = null; this.resetSeries(); }
+  /** Acknowledge suspension without bypassing cooldown, quota or fresh-sample requirements. */
+  resume() {
+    this.suspendUntil = 0;
+    this.suspendedReason = null;
+    this.awaitingImprovement = false;
+    this.resetSeries();
+  }
 
   restartRequested(now, automatic) {
     if (automatic) this.restarts.push(now);

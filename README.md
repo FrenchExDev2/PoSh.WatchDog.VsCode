@@ -10,7 +10,7 @@ Windows Desktop only. Runs locally, with no runtime npm dependencies or telemetr
 
 ## Install
 
-Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.0.vsix`, then reload the window if upgrading.
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.1.vsix`, then reload the window if upgrading.
 
 Requires **VS Code 1.114+** (Stable or Insiders), **Windows** and **PowerShell 7 Core** for the independent collector. Monitoring ordinary processes needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
 
@@ -42,7 +42,7 @@ One GiB is 1,073,741,824 bytes.
 Open the **PowerShell Watchdog** activity-bar view or run **PowerShell Watchdog: Open Live Dashboard** for a larger editor tab. Both receive the same live measurements.
 
 - At the top, **Live monitoring → Refresh interval** configures live collection: **0 (off), 250 ms, 500 ms, 1 s, 2 s or 5 s**, shared between this window's dashboard views. The current cadence appears below the selector. The delay starts after collection completes; live collection pauses while every dashboard is hidden. Off preserves the normal Watchdog schedule. The selection lasts for the current extension session.
-- Private and resident memory curves with process selection, creation-time identities and explicit collection gaps. Blue curves show private memory; purple dashed curves show resident memory.
+- Private and resident memory curves with process selection, creation-time identities and explicit collection gaps. Blue curves show private memory; purple dashed curves show resident memory. The vertical axis has Gio (GiB) graduations and horizontal grid lines, with readable labels that adapt to the sidebar width.
 - **Development, Tests and Build thresholds appear together** on the diagram, using current user settings and absolute overrides for the selected process kind. The active profile is marked in the legend; dotted lines show warning thresholds and long-dashed lines show high thresholds. Toggle **Show all workload profiles** to hide these comparison lines.
 - Processes grouped by terminal/root, sorted by private memory, CPU, PID or process tree; filter by Editor Services, terminal or child.
 - Private memory, resident memory, CPU, threads, handles, growth and observed activity. **Open** focuses the process's current terminal when it is still available.
@@ -54,7 +54,21 @@ Growth alerts default to **+500 MiB over five minutes**. They require at least t
 
 ## Workload profiles and thresholds
 
-**Select Workload Profile…** or the dashboard selects `development` (×1), `tests` (×1.5) or `build` (×2). The multiplier applies to the global warning/high thresholds. Explicit `processThresholds` values are absolute GiB and take precedence for that kind:
+A workload profile sets how much private committed memory Watchdog tolerates **per process** before warning or reaching the high threshold. Higher thresholds allow more memory for demanding workloads such as test suites and builds.
+
+With the default global thresholds (`warningPrivateGiB: 4`, `restartPrivateGiB: 8`) and no per-process overrides:
+
+| Profile | Intended workload | Multiplier | Warning | High threshold |
+| --- | --- | ---: | ---: | ---: |
+| `development` (default) | Everyday editing and development | ×1 | 4 GiB | 8 GiB |
+| `tests` | Test suites that need more memory | ×1.5 | 6 GiB | 12 GiB |
+| `build` | Memory-intensive builds | ×2 | 8 GiB | 16 GiB |
+
+Choose a profile manually through **PowerShell Watchdog: Select Workload Profile…** or the dashboard. Watchdog saves the choice in VS Code user settings; it does not automatically switch profiles when tests or builds start, or revert when they finish. Selecting a profile only changes these memory thresholds; it does not launch a workload or change PowerShell's execution settings.
+
+The multiplier applies to your configured global thresholds, so changing those base values also changes the table's effective values. An explicit `processThresholds` value is an **absolute GiB threshold**: it takes precedence for that process kind and is never multiplied. Warning and high overrides are independent; an omitted value still uses the corresponding global threshold multiplied by the profile factor.
+
+For example, this configuration selects `tests` but explicitly sets both thresholds for all three process kinds, so those values stay the same whichever profile is selected:
 
 ```json
 {
@@ -67,7 +81,7 @@ Growth alerts default to **+500 MiB over five minutes**. They require at least t
 }
 ```
 
-Terminal/child high thresholds remain alert-only. Profile and threshold changes require fresh measurements and cancel any existing countdown. All settings remain user-machine scoped.
+The high threshold can trigger an automatic restart only for verified **Editor Services**, subject to the restart policy and its protections. Terminal/child high thresholds remain alert-only. Profile and threshold changes require fresh measurements and cancel any existing countdown. All settings remain user-machine scoped.
 
 ## Restart policy
 
@@ -83,7 +97,7 @@ Configure `frenchexdev.powershellWatchdog.*` in **user settings**. Workspace and
 
 The collection interval begins after each collection completes. Continuity checks allow the collector deadline plus scheduling tolerance; a collection failure or a longer gap resets consecutive samples. A pending quota save does not prevent disabling, suspending or deferring a restart before its command is sent.
 
-Failed or timed-out restart requests, persistent high memory after stabilization, and exhausted quotas suspend automatic actions. Use **Resume** to continue; it preserves the rolling quota and cannot bypass a pending request. Disabling Watchdog survives a window reload.
+Failed or timed-out restart requests, persistent high memory after stabilization, and exhausted quotas suspend automatic actions. **Enable** and **Resume** both enable monitoring, clear persisted suspension and acknowledge the previous improvement check, then immediately request fresh measurements. Cooldown, rolling-hour quota and pending-command protections remain active; an exhausted quota can suspend automatic restarts again. Disabling Watchdog survives a window reload.
 
 ## Diagnostics
 
@@ -109,6 +123,17 @@ Only processes with a verifiable ownership chain to the current window are inclu
 ## Development and details
 
 Development requires Node 22+. Install tools with `npm ci --ignore-scripts`, run `node --test test/*.test.js`, and package with `node node_modules/@vscode/vsce/vsce package --no-dependencies --out dist/`. Agents must follow the repository's QuietCli instructions.
+
+To build and install the current version automatically, run in PowerShell Core 7.6+:
+
+```powershell
+./scripts/Build-InstallVsix.ps1                      # VS Code Insiders (default)
+./scripts/Build-InstallVsix.ps1 -Channel Stable      # VS Code Stable
+./scripts/Build-InstallVsix.ps1 -Profile 'Development'
+./scripts/Build-InstallVsix.ps1 -WhatIf              # Preview without building or installing
+```
+
+The script locates the project independently of the current directory, uses local `vsce`, verifies the packaged identity, writes a SHA-256 file in `dist/`, installs the VSIX and confirms its installed version. It calls Node and the VS Code CLI directly, with readable terminal output. It requires Node 22+ and the development dependencies above; no PowerShell module is required. Use `-CodeCliPath` for a custom VS Code CLI location. Reload the target VS Code window after installation to load the new code.
 
 - [Qualification](QUALIFICATION.md): tested environments, browser and integration evidence, and remaining limits.
 - [Release guide](RELEASING.md): automated Marketplace publication from a version tag.

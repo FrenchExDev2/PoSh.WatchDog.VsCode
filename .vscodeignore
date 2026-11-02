@@ -11,6 +11,7 @@ AGENTS.md
 CLAUDE.md
 SKILLS.md
 RELEASING.md
+scripts/Build-InstallVsix.ps1
 .gitignore
 .gitattributes
 .vscodeignore

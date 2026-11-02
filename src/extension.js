@@ -100,14 +100,22 @@ async function activate(context) {
     catch { void vscode.window.showErrorMessage('PowerShell Watchdog action failed. Open diagnostics and check settings or storage access.'); }
   }));
   const setEnabled = (value) => vscode.workspace.getConfiguration(section).update('enabled', value, vscode.ConfigurationTarget.Global);
-  register('enable', () => setEnabled(true));
+  /** Apply the enabled setting and clear persisted suspension before requesting fresh evidence. */
+  const resumeMonitoring = async () => {
+    await setEnabled(true);
+    // Configuration change delivery may lag behind update(), or be absent when already enabled.
+    controller.configure(readPolicy());
+    await controller.resume();
+    return controller.tick();
+  };
+  register('enable', resumeMonitoring);
   register('disable', () => setEnabled(false));
   register('suspend', async () => {
     const value = await vscode.window.showInputBox({ prompt: 'Suspend monitoring for how many minutes?', value: '15',
       validateInput: (text) => Number.isFinite(Number(text)) && Number(text) > 0 && Number(text) <= 10080 ? null : 'Enter a duration between 0 and 10080 minutes.' });
     if (value !== undefined) await controller.suspend(Number(value));
   });
-  register('resume', () => controller.resume());
+  register('resume', resumeMonitoring);
   register('dashboard', () => dashboard.open());
   register('cancelRestart', () => controller.cancelRestart());
   register('postponeRestart', () => controller.postponeRestart());

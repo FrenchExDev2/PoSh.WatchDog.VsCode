@@ -1,4 +1,14 @@
-# Qualification — 0.5.0
+# Qualification — 0.5.1
+
+Date: **2 November 2026**. Enable and Resume now clear persisted suspension and request fresh measurement. Explicit resume acknowledges the previous post-restart improvement failure, while retaining cooldown, rolling-hour quota and pending-command protections.
+
+**114 automated tests pass on the Windows host, zero failures or skipped tests.** Seven local VSIX delivery regressions cover successful installation with Unicode/profile arguments, packaging/installation failures, missing or mismatched packages, unconfirmed installation and preview behavior. Four command-registration regressions exercise both actions with monitoring already enabled or disabled, including delayed configuration events, persisted restart failure and timed suspension. Two policy regressions cover fresh-sample authorization after acknowledgement and preservation of cooldown/quota. Five regressions failed before the runtime fix; the quota/cooldown preservation case already passed. VS Code command registrations use an isolated API fixture with the real controller and policy; this does not requalify real Editor Services restart behavior.
+
+Evidence: `%TEMP%/watchdog-release-0.5.1-82b43103` contains `Unit.log`, `Unit.result.json`, `Dashboard.log`, `Dashboard.result.json`, `state.json` and `summary.txt`. Reopen the saved monitor using `pwsh -NoProfile -File "$env:TEMP/watchdog-release-0.5.1-82b43103/Watch.ps1" -RunRoot "$env:TEMP/watchdog-release-0.5.1-82b43103"`; it exits automatically for completed runs. The dashboard browser validation also passes: readable Gio graduations, shared memory/profile scale, zero/fractional/large values, and 340px sidebar resizing; screenshots and check details are recorded in `verification/dashboard-browser.json`. Historical before-fix evidence remains in `%TEMP%/watchdog-resume-red-c39dbf22`.
+
+---
+
+# Historical qualification — 0.5.0
 
 Date: **2 November 2026**. Source validation for configurable live dashboard collection and simultaneous Development/Tests/Build threshold comparisons.
 

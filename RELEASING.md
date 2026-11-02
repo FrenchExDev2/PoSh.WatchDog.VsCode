@@ -11,6 +11,12 @@ Core 7.6 or later on a Windows runner. CI runs the automated unit and prepared
 process-graph tests; installed Desktop integration remains the separate
 qualification described in `QUALIFICATION.md`.
 
+## Build and install locally
+
+After `npm ci --ignore-scripts`, run `./scripts/Build-InstallVsix.ps1` in PowerShell Core 7.6+ to build and install the version from `package.json` into VS Code Insiders. Use `-Channel Stable` for Stable, `-Profile 'Development'` for a specific profile, or `-WhatIf` to preview. The script calls native tools directly with readable terminal output, checks the VSIX identity and SHA-256, stops on failed steps and confirms the installed version. No PowerShell module is required. Reload the target window after installation.
+
+The local script does not run the test suite. Run the existing tests before preparing a release; Marketplace publication follows the workflow below.
+
 ## One-time Marketplace setup
 
 Sign in to the [Marketplace publisher management page](https://marketplace.visualstudio.com/manage/publishers/FrenchExDev).

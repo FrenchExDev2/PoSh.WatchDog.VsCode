@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- Add readable Gio graduations and horizontal grid lines to the live memory chart, with a shared scale for measurements and profile thresholds and labels that adapt to sidebar resizing.
+- Add a verified local VSIX build/install script with channel and profile selection, SHA-256 output and failure-path regression tests.
+- Make Enable and Resume clear persisted suspension, enable monitoring and immediately request a fresh collection, including when the enabled setting was already true.
+- Clear the acknowledged post-restart improvement blocker on explicit resume while preserving cooldown, rolling-hour quota and pending-command protections.
+
 ## 0.5.0
 
 - Add shared live dashboard collection delays: off, 250 ms, 500 ms, 1 s, 2 s and 5 s, pausing when all dashboards are hidden and waiting for each collection to complete.

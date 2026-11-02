@@ -97,6 +97,30 @@ test('automatic restarts without sustained improvement suspend after cooldown an
   assert.equal(reloaded.evaluate(sample(), 120000).state, 'suspended');
 });
 
+test('explicit resume acknowledges failed improvement and requires a fresh high-memory series', () => {
+  const engine = new PolicyEngine();
+  engine.restartRequested(0, true);
+  engine.restartFinished(0, 'succeeded');
+  for (const now of [120000, 135000, 150000]) engine.evaluate(sample(), now);
+  assert.equal(engine.evaluate(sample(), 165000).state, 'suspended');
+  const reloaded = new PolicyEngine(engine.policy, engine.persist());
+  reloaded.resume();
+  assert.equal(reloaded.evaluate(sample(), 180000).restart, false);
+  assert.equal(reloaded.evaluate(sample(), 195000).restart, false);
+  assert.equal(reloaded.evaluate(sample(), 210000).restart, true);
+  assert.deepEqual(reloaded.restarts, [0]);
+});
+
+test('resume preserves cooldown and the rolling-hour restart quota', () => {
+  const engine = new PolicyEngine({ ...defaults, consecutiveSamples: 1 }, { restarts: [0, 1, 2], cooldownUntil: 120000 });
+  engine.resume();
+  assert.equal(engine.evaluate(sample(), 30000).state, 'cooldown');
+  const decision = engine.evaluate(sample(), 120000);
+  assert.equal(decision.state, 'suspended');
+  assert.match(decision.detail, /quota/);
+  assert.equal(decision.restart, false);
+});
+
 test('AC-13: disabled and notifyOnly never authorize automatic restart', () => {
   for (const policy of [{ ...defaults, enabled: false }, { ...defaults, mode: 'notifyOnly' }]) {
     const engine = new PolicyEngine(policy);

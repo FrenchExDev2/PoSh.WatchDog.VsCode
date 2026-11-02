@@ -85,8 +85,27 @@ function dashboardClient() {
     for (const p of points) max = Math.max(max, p.privateBytes || 0, p.workingSetBytes || 0);
     for (const p of thresholds) max = Math.max(max, (p.warningPrivateGiB || 0) * 1024 ** 3, (p.restartPrivateGiB || 0) * 1024 ** 3);
     const node = (name, attrs) => { const el = document.createElementNS('http://www.w3.org/2000/svg', name); for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, String(value)); svg.append(el); return el; };
-    const x = (at) => 25 + (at - first) / span * 950;
-    const y = (bytes) => 185 - bytes / max * 165;
+    // Keep labels at a readable size in both the sidebar and the full panel.
+    const width = Math.max(220, svg.clientWidth || 1000);
+    svg.setAttribute('viewBox', `0 0 ${width} 210`);
+    const GiB = 1024 ** 3;
+    const rawStep = Math.max(1, max / GiB) / 4;
+    const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+    const step = [1, 2, 2.5, 4, 5, 10].find((value) => value * magnitude >= rawStep) * magnitude;
+    const intervals = Math.ceil(Math.max(1, max / GiB) / step);
+    const ceiling = intervals * step;
+    const digits = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+    const labels = Array.from({ length: intervals + 1 }, (_, i) => `${Number((i * step).toFixed(digits))} Gio`);
+    const left = Math.max(...labels.map((label) => label.length)) * 8 + 12;
+    const right = width - 12;
+    const x = (at) => left + (at - first) / span * (right - left);
+    const y = (bytes) => 185 - bytes / GiB / ceiling * 165;
+    for (let i = 0; i <= intervals; i++) {
+      const level = y(i * step * GiB);
+      node('line', { x1: left, x2: right, y1: level, y2: level, stroke: 'currentColor', 'stroke-opacity': 0.18, 'data-grid': 'memory' });
+      node('text', { x: left - 8, y: level, fill: 'currentColor', 'font-size': 12, 'text-anchor': 'end', 'dominant-baseline': 'middle', 'data-axis': 'memory' }).textContent = labels[i];
+    }
+    node('line', { x1: left, x2: left, y1: 20, y2: 185, stroke: 'currentColor', 'stroke-opacity': 0.5 });
     const profileColors = { development: '#e6b450', tests: '#ee8fba', build: '#8bd49c' };
     const groupedThresholds = new Map();
     for (const p of thresholds) for (const [key, label, dash] of [['warningPrivateGiB', 'warning', '3 5'], ['restartPrivateGiB', 'high', '10 5']]) {
@@ -97,7 +116,7 @@ function dashboardClient() {
     }
     for (const p of groupedThresholds.values()) {
       const description = `${p.profile} · ${p.kinds.join('/')} · ${p.label} ${p[p.key]} GiB${p.profile === model.profile ? ' · active' : ''}`;
-      const line = node('line', { x1: 25, x2: 975, y1: y(p[p.key] * 1024 ** 3), y2: y(p[p.key] * 1024 ** 3), stroke: profileColors[p.profile], 'stroke-dasharray': p.dash, 'data-profile': p.profile });
+      const line = node('line', { x1: left, x2: right, y1: y(p[p.key] * 1024 ** 3), y2: y(p[p.key] * 1024 ** 3), stroke: profileColors[p.profile], 'stroke-dasharray': p.dash, 'data-profile': p.profile });
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = description; line.append(title);
       const item = text('li', description); item.style.color = profileColors[p.profile]; legend.append(item);
     }
@@ -119,7 +138,6 @@ function dashboardClient() {
       }
       flush();
     }
-    node('text', { x: 25, y: 14, fill: 'currentColor', 'font-size': 12 }).textContent = memory(max);
     caption.textContent = `${points.length} retained observations · ${date(first)} → ${date(last)}. Blue: private; purple dashed: resident. Profile lines: dotted warning / long-dashed high, current settings for this process kind. Latest 200 events across sessions; gaps are not zero.`;
   }
 
@@ -183,6 +201,7 @@ function dashboardClient() {
   $('profile').onchange = () => send('profile', { profile: $('profile').value });
   $('live-interval').onchange = () => send('liveInterval', { milliseconds: Number($('live-interval').value) });
   $('show-profiles').onchange = chart;
+  new ResizeObserver(chart).observe($('chart'));
   $('sort').onchange = inventory; $('kind').onchange = inventory;
   $('process-select').onchange = () => { selection = $('process-select').value; chart(); };
   for (const action of ['refresh', 'cancelRestart', 'postponeRestart', 'restartNow', 'visualDiagnostics', 'diagnostics']) $(action).onclick = () => send(action);
