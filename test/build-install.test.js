@@ -11,7 +11,8 @@ const execute = promisify(execFile);
 
 /** Run the actual delivery script against isolated CLI fixtures, retaining argument boundaries. */
 async function fixture(t, scenario) {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'watchdog vsix épreuve '));
+  // Windows CI can expose TEMP through an 8.3 alias; compare the actual canonical paths.
+  const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'watchdog vsix épreuve ')));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   await fs.mkdir(path.join(directory, 'scripts'));
   await fs.mkdir(path.join(directory, 'node_modules/@vscode/vsce'), { recursive: true });
