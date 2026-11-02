@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./images/icon.png" alt="PowerShell Memory Watchdog logo" width="150px" />
+</p>
+
 # PowerShell Memory Watchdog
 
 Monitor the memory used by PowerShell processes in each VS Code window. Get alerts for terminals and nested `pwsh` processes, and optionally restart a verified PowerShell Editor Services session when its memory stays too high.
