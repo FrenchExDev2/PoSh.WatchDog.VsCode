@@ -38,7 +38,8 @@ function reportClient(tools) {
     byId('summary').append(card);
   }
   const quality = report.quality;
-  const notes = [`Sources: ${quality.filesRead} retained journal file(s), ${(quality.bytesRead / 1048576).toFixed(2)} MiB read, plus current in-memory history.`,
+  const notes = [`History scope: ${quality.historyScope === 'workspace' ? 'workspace across sessions; the current inventory remains window-scoped' : 'current window journals'}.`,
+    `Sources: ${quality.filesRead} retained journal file(s), ${(quality.bytesRead / 1048576).toFixed(2)} MiB read, plus current in-memory history.`,
     `${quality.duplicates} duplicate entries removed.`];
   if (!quality.filesRead) notes.push('No disk journal was available; this report uses the available in-memory history.');
   if (quality.incompleteEntries) notes.push(`${quality.incompleteEntries} historical inventories have partial or unknown coverage. Missing processes and collection errors interrupt their curves.`);
@@ -74,7 +75,11 @@ function reportClient(tools) {
     let last = report.entries.at(-1).at;
     if (first === last) { first -= 15000; last += 15000; }
     const showThresholds = byId('thresholds').checked;
-    const thresholdValues = showThresholds ? report.entries.flatMap((item) => [item.warningPrivateGiB, item.restartPrivateGiB]).filter(Number.isFinite).map((value) => value * GiB) : [];
+    const threshold = (entry, field) => {
+      const process = entry.processes.find((item) => item.id === identity) || (entry.sample?.id === identity ? entry.sample : null);
+      return process ? process.thresholds?.[field] ?? entry[field] : null;
+    };
+    const thresholdValues = showThresholds ? report.entries.flatMap((item) => [threshold(item, 'warningPrivateGiB'), threshold(item, 'restartPrivateGiB')]).filter(Number.isFinite).map((value) => value * GiB) : [];
     let peak = GiB / 100;
     for (const point of allPoints) peak = Math.max(peak, point.value);
     for (const value of thresholdValues) peak = Math.max(peak, value);
@@ -97,7 +102,7 @@ function reportClient(tools) {
         let previous = null;
         let commands = '';
         for (const entry of report.entries) {
-          const value = entry[field];
+          const value = threshold(entry, field);
           if (!Number.isFinite(value)) { previous = null; continue; }
           if (previous === null) commands += `M ${x(entry.at)} ${y(value * GiB)} `;
           else commands += `H ${x(entry.at)} V ${y(value * GiB)} `;

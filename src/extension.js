@@ -5,9 +5,13 @@ const { readMachinePolicy } = require('./configuration');
 const { WatchdogError } = require('./session');
 const { WindowProcessObserver } = require('./observer');
 const { describeStatus } = require('./presentation');
-const { Journal } = require('./journal');
+const path = require('node:path');
+const { PersistentJournal } = require('./history');
+const { ActivityTracker } = require('./activity');
+const { createDashboard } = require('./dashboard');
 const { WatchdogController } = require('./controller');
 const { exportVisualReport } = require('./diagnostics-report');
+const { createReportPanel } = require('./report-panel');
 
 const section = 'frenchexdev.powershellWatchdog';
 
@@ -25,7 +29,9 @@ function environmentProblem() {
   return null;
 }
 
-function activate(context) {
+async function activate(context) {
+  const reportPanel = createReportPanel(vscode);
+  context.subscriptions.push(reportPanel);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
   status.name = 'PowerShell Memory Watchdog';
   status.command = 'powershellWatchdog.menu';
@@ -33,22 +39,37 @@ function activate(context) {
   const debugSessions = new Set();
   if (vscode.debug.activeDebugSession?.type.toLowerCase() === 'powershell') debugSessions.add(vscode.debug.activeDebugSession.id);
   let controller;
-  const observer = new WindowProcessObserver(vscode);
-  const update = (snapshot) => {
+  let dashboard;
+  const activity = new ActivityTracker(vscode.window, (terminal) => controller?.activityChanged(terminal));
+  const observer = new WindowProcessObserver(vscode, { activity });
+  const update = (snapshot, updateDashboard = true) => {
     const display = describeStatus(snapshot);
     status.text = display.text;
     status.tooltip = display.tooltip;
     status.backgroundColor = ['error', 'suspended', 'ambiguous', 'unsupported'].includes(snapshot.state) ?
       new vscode.ThemeColor('statusBarItem.errorBackground') :
       ['warning', 'confirmed'].includes(snapshot.state) ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
+    if (updateDashboard) dashboard?.update();
   };
-  const notice = (_level, message) => {
+  const notice = (level, message) => {
+    if (level === 'countdown') {
+      const intent = controller.restartIntent;
+      void vscode.window.showWarningMessage(message, 'Cancel restart', 'Postpone 5 minutes', 'Restart now').then(async (action) => {
+        if (controller.restartIntent !== intent) return;
+        if (action === 'Cancel restart') await controller.cancelRestart();
+        if (action === 'Postpone 5 minutes') await controller.postponeRestart();
+        if (action === 'Restart now') await controller.restartNow();
+      }).catch(() => {});
+      return;
+    }
     void vscode.window.showWarningMessage(message, 'Diagnostics', 'Suspend 15 minutes').then(async (action) => {
       if (action === 'Diagnostics') await vscode.commands.executeCommand('powershellWatchdog.diagnostics');
       if (action === 'Suspend 15 minutes') await controller.suspend(15);
     }).catch(() => {});
   };
-  const journal = new Journal(context.logUri.fsPath);
+  const initialPolicy = readPolicy();
+  const journal = new PersistentJournal(path.join(context.storageUri?.fsPath || context.globalStorageUri.fsPath, 'history'), initialPolicy);
+  await journal.ready;
   controller = new WatchdogController({
     observe: (milliseconds, signal) => {
       const problem = environmentProblem();
@@ -58,10 +79,21 @@ function activate(context) {
     commands: () => vscode.commands.getCommands(true),
     restart: () => vscode.commands.executeCommand('PowerShell.RestartSession'),
     debugging: () => debugSessions.size > 0,
+    activity: (target) => activity.get(target?.terminal),
     journal,
     store: (value) => context.workspaceState.update('watchdog.policyState', value),
     onChange: update, notice,
-  }, readPolicy(), context.workspaceState.get('watchdog.policyState', {}));
+  }, initialPolicy, context.workspaceState.get('watchdog.policyState', {}));
+
+  dashboard = createDashboard(vscode, { getSnapshot: () => controller.snapshot(), onAction: async (action, value) => {
+    if (action === 'refresh') return controller.tick();
+    if (action === 'showTerminal') {
+      if (!observer.showTerminal(value)) void vscode.window.showInformationMessage('This terminal is no longer available in this window. Collect again to refresh the process inventory.');
+      return;
+    }
+    if (action === 'profile') return vscode.workspace.getConfiguration(section).update('profile', value, vscode.ConfigurationTarget.Global);
+    return vscode.commands.executeCommand(`powershellWatchdog.${action}`);
+  } });
 
   const register = (name, callback) => context.subscriptions.push(vscode.commands.registerCommand(`powershellWatchdog.${name}`, async () => {
     try { return await callback(); }
@@ -76,6 +108,14 @@ function activate(context) {
     if (value !== undefined) await controller.suspend(Number(value));
   });
   register('resume', () => controller.resume());
+  register('dashboard', () => dashboard.open());
+  register('cancelRestart', () => controller.cancelRestart());
+  register('postponeRestart', () => controller.postponeRestart());
+  register('restartNow', () => controller.restartNow());
+  register('selectProfile', async () => {
+    const profile = await vscode.window.showQuickPick(['development', 'tests', 'build'], { title: 'Workload profile · thresholds ×1 / ×1.5 / ×2; explicit process thresholds take precedence' });
+    if (profile) await vscode.workspace.getConfiguration(section).update('profile', profile, vscode.ConfigurationTarget.Global);
+  });
   register('changeMode', async () => {
     const value = await vscode.window.showQuickPick(['automatic', 'notifyOnly'], {
       title: 'Automatic restarts discard session state and can interrupt interactive commands.',
@@ -94,14 +134,15 @@ function activate(context) {
     const document = await vscode.workspace.openTextDocument({ language: 'json', content: JSON.stringify({
       ...snapshot, environment: { vscode: vscode.version, app: vscode.env.appName, platform: process.platform,
         remote: vscode.env.remoteName || null, powershellExtension: vscode.extensions.getExtension('ms-vscode.powershell')?.packageJSON.version || null },
-      limitations: ['Interactive command activity is unknown.', 'Ordinary terminal and child pwsh processes generate alerts; automatic restart is limited to verified Editor Services.',
+      limitations: ['Activity is known only from observed VS Code shell execution events; unknown never means idle. Editor Services may not expose those events.', 'Ordinary terminal and child pwsh processes generate alerts; automatic restart is limited to verified Editor Services.',
         'Editor Services automatic restart association supports ms-vscode.powershell 2026.1.2; other pwsh measurement does not require it.',
         'Stable and Insiders qualification results are recorded separately in QUALIFICATION.md.'],
     }, null, 2) });
     await vscode.window.showTextDocument(document, { preview: true });
   });
   register('menu', async () => {
-    const items = [ ['Visual diagnostics (HTML)', 'visualDiagnostics'], ['Diagnostics (JSON)', 'diagnostics'], ['Enable', 'enable'], ['Disable', 'disable'],
+    const items = [ ['Live dashboard', 'dashboard'], ['Visual diagnostics (HTML)', 'visualDiagnostics'], ['Diagnostics (JSON)', 'diagnostics'], ['Workload profile…', 'selectProfile'],
+      ['Cancel scheduled restart', 'cancelRestart'], ['Postpone restarts 5 minutes', 'postponeRestart'], ['Restart scheduled session now', 'restartNow'], ['Enable', 'enable'], ['Disable', 'disable'],
       ['Suspend…', 'suspend'], ['Resume', 'resume'], ['Change mode…', 'changeMode'], ['Restart session…', 'restart'] ];
     const selection = await vscode.window.showQuickPick(items.map(([label, action]) => ({ label, action })), { title: 'PowerShell Memory Watchdog' });
     if (selection) await vscode.commands.executeCommand(`powershellWatchdog.${selection.action}`);
@@ -112,23 +153,23 @@ function activate(context) {
         platform: process.platform, node: process.versions.node,
         powershellExtension: vscode.extensions.getExtension('ms-vscode.powershell')?.packageJSON.version || null },
       storagePath: context.storageUri?.fsPath, globalStoragePath: context.globalStorageUri.fsPath,
-      openExternal: (filePath) => vscode.env.openExternal(vscode.Uri.file(filePath)),
+      openReport: (_filePath, html) => reportPanel.open(html),
       onOpenFailure: (filePath) => {
-        void vscode.window.showWarningMessage(`HTML report saved at ${filePath}. The external application could not be opened.`, 'Reveal report').then(async (choice) => {
+        void vscode.window.showWarningMessage(`HTML report saved at ${filePath}. The VS Code diagnostic tab could not be opened.`, 'Reveal report').then(async (choice) => {
           if (choice === 'Reveal report') await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(filePath));
         }).catch(() => {});
       },
     });
     return vscode.Uri.file(result.filePath);
   });
-  context.subscriptions.push(status, controller,
+  context.subscriptions.push(status, controller, activity, dashboard,
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration(section)) controller.configure(readPolicy());
+      if (event.affectsConfiguration(section)) { const policy = readPolicy(); journal.configure(policy); controller.configure(policy); }
     }),
-    vscode.debug.onDidStartDebugSession((session) => { if (session.type.toLowerCase() === 'powershell') { debugSessions.add(session.id); controller.engine.resetSeries(); } }),
-    vscode.debug.onDidTerminateDebugSession((session) => { if (debugSessions.delete(session.id)) controller.engine.resetSeries(); }),
+    vscode.debug.onDidStartDebugSession((session) => { if (session.type.toLowerCase() === 'powershell') { debugSessions.add(session.id); controller.activityChanged(); } }),
+    vscode.debug.onDidTerminateDebugSession((session) => { if (debugSessions.delete(session.id)) controller.activityChanged(); }),
   );
-  const ageTimer = setInterval(() => update(controller.snapshot()), 1000);
+  const ageTimer = setInterval(() => update(controller.snapshot(), false), 1000);
   context.subscriptions.push({ dispose: () => clearInterval(ageTimer) });
   controller.start();
   // Read-only diagnostics and an explicit sample request are useful to integration clients.

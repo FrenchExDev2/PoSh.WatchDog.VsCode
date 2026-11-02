@@ -6,7 +6,19 @@ const defaults = Object.freeze({
   warningPrivateGiB: 4, restartPrivateGiB: 8, consecutiveSamples: 3,
   collectTimeoutSeconds: 3, restartTimeoutSeconds: 45, cooldownSeconds: 120,
   maxAutomaticRestartsPerHour: 3, deferWhileDebugging: true,
+  profile: 'development', processThresholds: Object.freeze({}), restartGraceSeconds: 30,
+  deferWhileRunningCommands: true, requireKnownIdle: false,
+  growthWarningMiB: 500, growthWindowSeconds: 300,
+  historyRetentionDays: 14, historyMaxMiB: 15, reportRetentionDays: 14, reportMaxMiB: 20,
 });
+
+/** Resolve user-machine thresholds for one process kind and the selected workload profile. */
+function processPolicy(policy, kind = 'editorServices') {
+  const factor = { development: 1, tests: 1.5, build: 2 }[policy.profile] || 1;
+  const overrides = policy.processThresholds?.[kind] || {};
+  return { ...policy, warningPrivateGiB: overrides.warningPrivateGiB ?? policy.warningPrivateGiB * factor,
+    restartPrivateGiB: overrides.restartPrivateGiB ?? policy.restartPrivateGiB * factor };
+}
 
 function validatePolicy(policy) {
   const errors = [];
@@ -26,6 +38,23 @@ function validatePolicy(policy) {
   if (!['automatic', 'notifyOnly'].includes(policy.mode)) errors.push('Unknown mode.');
   for (const name of ['enabled', 'deferWhileDebugging']) {
     if (typeof policy[name] !== 'boolean') errors.push(`${name} must be boolean.`);
+  }
+  for (const name of ['deferWhileRunningCommands', 'requireKnownIdle']) {
+    if (typeof policy[name] !== 'boolean') errors.push(`${name} must be boolean.`);
+  }
+  if (!['development', 'tests', 'build'].includes(policy.profile)) errors.push('Unknown workload profile.');
+  if (!Number.isFinite(policy.restartGraceSeconds) || policy.restartGraceSeconds < 0 || policy.restartGraceSeconds > 3600) errors.push('restartGraceSeconds must be between 0 and 3600.');
+  for (const [name, minimum, maximum] of [['growthWarningMiB', 1, 1048576], ['growthWindowSeconds', 1, 86400],
+    ['historyRetentionDays', 1, 365], ['historyMaxMiB', 1, 100], ['reportRetentionDays', 1, 365], ['reportMaxMiB', 1, 500]]) {
+    if (!Number.isFinite(policy[name]) || policy[name] < minimum || policy[name] > maximum) errors.push(`${name} must be between ${minimum} and ${maximum}.`);
+  }
+  if (!policy.processThresholds || typeof policy.processThresholds !== 'object' || Array.isArray(policy.processThresholds)) errors.push('processThresholds must be an object.');
+  else for (const [kind, values] of Object.entries(policy.processThresholds)) {
+    if (!['editorServices', 'terminal', 'child'].includes(kind) || !values || typeof values !== 'object' || Array.isArray(values) ||
+      Object.keys(values).some((key) => !['warningPrivateGiB', 'restartPrivateGiB'].includes(key)) ||
+      Object.values(values).some((value) => !Number.isFinite(value) || value <= 0)) { errors.push('Invalid per-process thresholds.'); continue; }
+    const effective = processPolicy(policy, kind);
+    if (!(effective.warningPrivateGiB < effective.restartPrivateGiB)) errors.push(`${kind}: warning must be below restart threshold.`);
   }
   return errors;
 }
@@ -80,11 +109,11 @@ class PolicyEngine {
     }
   }
 
-  evaluate(sample, now, { debugging = false } = {}) {
-    const policy = this.policy;
+  evaluate(sample, now, { debugging = false, activity = 'unknown' } = {}) {
+    const policy = processPolicy(this.policy, sample?.kind || 'editorServices');
     this.restarts = this.restarts.filter((at) => at > now - 3600_000);
     const result = (state, detail, extra = {}) => ({ state, detail, restart: false, notifyWarning: false, ...extra });
-    const invalid = validatePolicy(policy);
+    const invalid = validatePolicy(this.policy);
     if (invalid.length) { this.resetSeries(); return result('error', invalid.join(' ')); }
     if (!policy.enabled) { this.resetSeries(); return result('disabled', 'Monitoring disabled.'); }
     if (this.suspendUntil > now) { this.resetSeries(); return result('suspended', 'Monitoring temporarily suspended.'); }
@@ -94,7 +123,9 @@ class PolicyEngine {
       this.warning = false;
       this.resetSeries();
     }
-    if (this.lastAt !== null && (now - this.lastAt > policy.sampleIntervalSeconds * 2500 || now <= this.lastAt)) this.resetSeries();
+    // The interval starts after collection completes; allow its full deadline as well as scheduling tolerance.
+    const maximumGap = (policy.sampleIntervalSeconds * 2.5 + policy.collectTimeoutSeconds) * 1000;
+    if (this.lastAt !== null && (now - this.lastAt > maximumGap || now <= this.lastAt)) this.resetSeries();
     if (this.lastDebugging !== debugging) this.resetSeries();
     this.lastDebugging = debugging;
     this.lastAt = now;
@@ -120,6 +151,10 @@ class PolicyEngine {
       this.resetSeries();
       return { ...base, state: 'deferred', detail: 'PowerShell debugging is active.' };
     }
+    if (policy.deferWhileRunningCommands && activity === 'busy' || policy.requireKnownIdle && activity !== 'idle') {
+      this.resetSeries();
+      return { ...base, state: 'deferred', detail: activity === 'busy' ? 'A terminal command is active.' : 'Terminal activity is unknown; verified idle is required.' };
+    }
     if (this.count < policy.consecutiveSamples) return base;
     if (this.awaitingImprovement) {
       this.suspendedReason = 'No sustained improvement after restart; automatic restarts suspended.';
@@ -133,4 +168,4 @@ class PolicyEngine {
   }
 }
 
-module.exports = { GiB, defaults, validatePolicy, identityKey, PolicyEngine };
+module.exports = { GiB, defaults, validatePolicy, identityKey, PolicyEngine, processPolicy };

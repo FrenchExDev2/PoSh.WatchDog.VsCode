@@ -38,6 +38,23 @@ test('AC-07: unknown sample and long gaps break continuity', () => {
   assert.equal(engine.count, 1);
 });
 
+test('continuity includes the collection deadline as well as the delay between collections', () => {
+  const engine = new PolicyEngine({ ...defaults, sampleIntervalSeconds: 1, collectTimeoutSeconds: 3 });
+  assert.equal(engine.evaluate(sample(), 0).restart, false);
+  assert.equal(engine.evaluate(sample(), 4000).restart, false);
+  assert.equal(engine.evaluate(sample(), 8000).restart, true);
+  assert.equal(engine.count, 3);
+});
+
+test('gaps beyond the collection-aware tolerance still reset the series', () => {
+  const engine = new PolicyEngine({ ...defaults, sampleIntervalSeconds: 1, collectTimeoutSeconds: 3 });
+  engine.evaluate(sample(), 0);
+  engine.evaluate(sample(), 5500);
+  assert.equal(engine.count, 2);
+  assert.equal(engine.evaluate(sample(), 11001).restart, false);
+  assert.equal(engine.count, 1);
+});
+
 test('explicit samples cannot accelerate the configured persistence interval', () => {
   const engine = new PolicyEngine();
   for (let now = 0; now < 15000; now += 1000) assert.equal(engine.evaluate(sample(), now).restart, false);

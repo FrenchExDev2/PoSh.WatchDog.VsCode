@@ -19,7 +19,7 @@ function fixture(overrides = {}, policy = {}) {
     restart: async () => { requests++; pid++; },
     debugging: () => false, journal,
     ...overrides,
-  }, { ...defaults, consecutiveSamples: 1, restartTimeoutSeconds: 0.04, ...policy });
+  }, { ...defaults, restartGraceSeconds: 0, consecutiveSamples: 1, restartTimeoutSeconds: 0.04, ...policy });
   return { controller, requests: () => requests };
 }
 
@@ -123,4 +123,103 @@ test('deadline and cancellation also bound non-resolving session association', a
   const task = withDeadline(() => new Promise(() => {}), 1000, abort.signal);
   abort.abort();
   await assert.rejects(task, { code: 'cancelled' });
+});
+
+for (const action of ['disable', 'notifyOnly', 'suspend', 'debug', 'dispose']) {
+  test(`restart is cancelled when ${action} occurs during quota persistence`, { timeout: 3000 }, async () => {
+    let reached;
+    let release;
+    let held = false;
+    let debugging = false;
+    let saved;
+    const waiting = new Promise((resolve) => { reached = resolve; });
+    const gate = new Promise((resolve) => { release = resolve; });
+    const { controller, requests } = fixture({
+      debugging: () => debugging,
+      store: async (value) => {
+        saved = structuredClone(value);
+        if (!held && value.suspendedReason && value.restarts.length) {
+          held = true;
+          reached();
+          await gate;
+        }
+      },
+    });
+    const running = controller.tick();
+    try {
+      await waiting;
+      if (action === 'disable') controller.configure({ ...controller.engine.policy, enabled: false });
+      if (action === 'notifyOnly') controller.configure({ ...controller.engine.policy, mode: 'notifyOnly' });
+      if (action === 'suspend') await controller.suspend(15);
+      if (action === 'debug') { debugging = true; controller.engine.resetSeries(); }
+      if (action === 'dispose') controller.dispose();
+      release();
+      await running;
+      assert.equal(requests(), 0);
+      assert.equal(controller.pendingCommand, false);
+      assert.equal(controller.engine.count, 0);
+      assert.equal(controller.engine.restarts.length, 0, 'A cancelled dispatch must not consume quota.');
+      assert.deepEqual(saved.restarts, []);
+      assert.equal(saved.suspendedReason, null, 'A cancelled dispatch must not leave a pending restart marker.');
+      if (action === 'disable') assert.equal(controller.state, 'disabled');
+      if (action === 'notifyOnly') assert.equal(controller.state, 'waiting');
+      if (action === 'suspend') assert.equal(controller.state, 'suspended');
+      if (action === 'debug') assert.equal(controller.state, 'deferred');
+    } finally { release(); await running; controller.dispose(); }
+  });
+}
+
+test('synchronous restart failure clears the command lock and suspends automatic actions', async () => {
+  const { controller } = fixture({ restart: () => { throw new Error('sensitive command text'); } });
+  await controller.tick();
+  assert.equal(controller.restartOutcome, 'failed');
+  assert.equal(controller.pendingCommand, false);
+  assert.equal(controller.state, 'suspended');
+  assert.equal(controller.engine.restarts.length, 1);
+  assert.ok(!JSON.stringify(controller.snapshot()).includes('sensitive command text'));
+});
+
+test('successful slow collections can satisfy persistence with a short sampling interval', async () => {
+  let now = 0;
+  const { controller, requests } = fixture({ now: () => now }, {
+    sampleIntervalSeconds: 1, collectTimeoutSeconds: 3, consecutiveSamples: 3,
+  });
+  // Two seconds of successful collection plus the one-second post-collection delay.
+  for (now of [0, 3000, 6000]) await controller.tick();
+  assert.equal(requests(), 1);
+  assert.equal(controller.restartOutcome, 'succeeded');
+});
+
+test('suspend, resume and configuration actions are retained without duplicate paused samples', async () => {
+  const { controller } = fixture({}, { mode: 'notifyOnly' });
+  const journal = controller.dependencies.journal;
+  await controller.tick();
+  await controller.suspend(15);
+  assert.equal(controller.sample, null);
+  await controller.tick();
+  await controller.tick();
+  await controller.resume();
+  assert.equal(controller.sample, null);
+  controller.configure({ ...controller.engine.policy, enabled: false });
+  await controller.tick();
+  await controller.tick();
+  controller.configure({ ...controller.engine.policy, enabled: true });
+  assert.deepEqual(journal.history.map((entry) => entry.state), ['confirmed', 'suspended', 'waiting', 'disabled', 'waiting']);
+  assert.ok(journal.history.slice(1).every((entry) => entry.sample === null && entry.processes === undefined));
+});
+
+test('an initially disabled controller records its state once without collecting', async () => {
+  const { controller } = fixture({ collect: () => { throw new Error('Must not collect.'); } }, { enabled: false });
+  await controller.tick();
+  await controller.tick();
+  assert.deepEqual(controller.dependencies.journal.history.map((entry) => entry.state), ['disabled']);
+});
+
+test('a rejected configuration event write is exposed without an unhandled rejection', async () => {
+  const journal = { history: [], append: async () => { throw new Error('Disk unavailable.'); } };
+  const { controller } = fixture({ journal });
+  controller.configure({ ...controller.engine.policy, enabled: false });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(journal.error, 'Policy change could not be recorded.');
+  assert.equal(controller.state, 'disabled');
 });

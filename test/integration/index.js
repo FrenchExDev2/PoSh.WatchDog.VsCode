@@ -188,6 +188,12 @@ exports.run = async () => {
     }, 'fresh inventory after policy configuration before exporting HTML');
     const htmlUri = await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');
     assert.equal(htmlUri.scheme, 'file');
+    const diagnosticTabs = () => vscode.window.tabGroups.all.flatMap((group) => group.tabs)
+      .filter((tab) => tab.input instanceof vscode.TabInputWebview && tab.label === 'PowerShell Watchdog · Visual diagnostics');
+    await until(() => diagnosticTabs().some((tab) => tab.isActive), 'visual diagnostic editor tab');
+    assert.equal(diagnosticTabs().length, 1);
+    await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');
+    assert.equal(diagnosticTabs().length, 1);
     const html = await fs.readFile(htmlUri.fsPath, 'utf8');
     assert.ok(html.startsWith('<!doctype html>'));
     const visual = JSON.parse(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1]);
@@ -199,7 +205,7 @@ exports.run = async () => {
     assert.ok(!html.includes('WatchdogSandboxAllocation'));
     report.observations.visualReport = { path: htmlUri.fsPath, bytes: Buffer.byteLength(html),
       retainedEntries: visual.entries.length, filesRead: visual.quality.filesRead };
-    report.checks.push('The installed HTML diagnostic command exports this window’s retained journals and process inventory to a standalone local file and requests external opening.');
+    report.checks.push('The installed HTML diagnostic command exports this window’s retained journals and process inventory to a standalone local file and displays it in one reusable VS Code webview tab.');
     const start = performance.now();
     const baseline = process.memoryUsage().heapUsed;
     for (let index = 0; index < 10000; index++) api.getSnapshot();

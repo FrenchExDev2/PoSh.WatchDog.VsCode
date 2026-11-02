@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0
+
+- Add a live activity-bar dashboard and reusable editor view with memory curves, terminal groups, process tree, filters, sorting and terminal navigation.
+- Add a cancellable automatic-restart countdown, persisted episode cancellation/postponement and restart-now action with final safety checks.
+- Add sustained memory-growth alerts and optional CPU, parent PID, thread and handle measurements.
+- Add development/tests/build workload profiles and absolute thresholds for Editor Services, terminals and child pwsh processes.
+- Persist bounded workspace history across sessions and automatically prune owned history segments and HTML exports by age and total size.
+- Explain collection timing, staleness, errors, activity source and automatic-restart blockers in the dashboard and JSON diagnostics.
+- Observe shell-execution lifecycle events without capturing command text; defer for known busy editor terminals and optionally require known idle.
+
+- Recheck user choices and debugger activity after saving a restart reservation; cancelled requests release their quota and pending marker before any command is sent.
+- Include the collector deadline when checking consecutive samples, so valid slow collections work with short sampling intervals.
+- Retain suspend, resume and configuration events in diagnostic history, including periods with no memory collection.
+- Display visual diagnostics in a reusable VS Code editor tab, refreshing it on each command and preserving the standalone HTML export.
+- Keep interactive charts and the report's restrictive content security policy; retain the saved location if the tab cannot open.
+
 ## 0.3.0
 
 - Add **Open Visual Diagnostics (HTML)** to export this window's retained journals and open an offline graphical report externally.

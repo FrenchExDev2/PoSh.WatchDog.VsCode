@@ -2,7 +2,7 @@
   "name": "powershell-watchdog",
   "displayName": "PowerShell Memory Watchdog",
   "description": "Monitor memory of pwsh processes owned by each local VS Code window on Windows.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "FrenchExDev",
   "repository": {
     "type": "git",
@@ -27,7 +27,8 @@
     "ui"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:powershellWatchdog.dashboardView"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -41,7 +42,9 @@
     "test": "node --test test/*.test.js",
     "package": "vsce package --no-dependencies --out dist/",
     "test:integration": "node test/run-integration.js",
-    "test:report-browser": "node test/run-report-browser.js"
+    "test:report-browser": "node test/run-report-browser.js",
+    "test:dashboard-browser": "node test/run-dashboard-browser.js",
+    "test:features-integration": "node test/run-features-integration.js"
   },
   "contributes": {
     "commands": [
@@ -80,6 +83,26 @@
       {
         "command": "powershellWatchdog.menu",
         "title": "PowerShell Watchdog: Show Actions"
+      },
+      {
+        "command": "powershellWatchdog.dashboard",
+        "title": "PowerShell Watchdog: Open Live Dashboard"
+      },
+      {
+        "command": "powershellWatchdog.cancelRestart",
+        "title": "PowerShell Watchdog: Cancel Scheduled Restart"
+      },
+      {
+        "command": "powershellWatchdog.postponeRestart",
+        "title": "PowerShell Watchdog: Postpone Restarts 5 Minutes"
+      },
+      {
+        "command": "powershellWatchdog.restartNow",
+        "title": "PowerShell Watchdog: Restart Scheduled Session Now"
+      },
+      {
+        "command": "powershellWatchdog.selectProfile",
+        "title": "PowerShell Watchdog: Select Workload Profile…"
       }
     ],
     "configuration": {
@@ -162,8 +185,156 @@
           "default": true,
           "description": "Defer automatic restart while any PowerShell debug session is active.",
           "scope": "machine"
+        },
+        "frenchexdev.powershellWatchdog.reportRetentionDays": {
+          "default": 14,
+          "description": "Age limit for owned exported HTML reports, enforced when exporting.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "frenchexdev.powershellWatchdog.historyRetentionDays": {
+          "default": 14,
+          "description": "Retain workspace history across VS Code sessions for this many days. Old owned segments are removed automatically.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "frenchexdev.powershellWatchdog.profile": {
+          "type": "string",
+          "enum": [
+            "development",
+            "tests",
+            "build"
+          ],
+          "default": "development",
+          "description": "Workload thresholds: development ×1, tests ×1.5, build ×2. Explicit per-process values take precedence.",
+          "scope": "machine"
+        },
+        "frenchexdev.powershellWatchdog.processThresholds": {
+          "properties": {
+            "terminal": {
+              "type": "object",
+              "properties": {
+                "restartPrivateGiB": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "warningPrivateGiB": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "child": {
+              "type": "object",
+              "properties": {
+                "restartPrivateGiB": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "warningPrivateGiB": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "editorServices": {
+              "type": "object",
+              "properties": {
+                "restartPrivateGiB": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "warningPrivateGiB": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "description": "Optional absolute GiB thresholds by process kind. Warning must be below high/restart threshold. Ordinary terminal and child processes only generate alerts.",
+          "additionalProperties": false,
+          "scope": "machine",
+          "default": {},
+          "type": "object"
+        },
+        "frenchexdev.powershellWatchdog.deferWhileRunningCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Defer automatic Editor Services restart while shell integration reports a running command. Missing signals remain unknown.",
+          "scope": "machine"
+        },
+        "frenchexdev.powershellWatchdog.historyMaxMiB": {
+          "default": 15,
+          "description": "Combined on-disk history budget in MiB. The oldest owned segments are removed first; the live dashboard keeps the latest 200 entries.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "frenchexdev.powershellWatchdog.reportMaxMiB": {
+          "default": 20,
+          "description": "Combined HTML report storage budget in MiB, enforced before each export. A single report above this limit is rejected.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "frenchexdev.powershellWatchdog.growthWindowSeconds": {
+          "default": 300,
+          "description": "Rolling observation window for memory growth alerts. Collection gaps reset the series; history is capped at 1024 points per process.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "frenchexdev.powershellWatchdog.requireKnownIdle": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require an observed idle shell integration state before automatic restart. Editor Services often cannot provide it; in that case restart remains deferred.",
+          "scope": "machine"
+        },
+        "frenchexdev.powershellWatchdog.growthWarningMiB": {
+          "default": 500,
+          "description": "Private memory growth alert in MiB over growthWindowSeconds, with at least three observations and 75% nondecreasing steps. This does not prove a leak.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "frenchexdev.powershellWatchdog.restartGraceSeconds": {
+          "default": 30,
+          "description": "Countdown before automatic Editor Services restart. Cancel, postpone or restart now; all final identity, memory and activity checks still apply. Zero disables the countdown.",
+          "scope": "machine",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3600
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "powershellWatchdog",
+          "title": "PowerShell Watchdog",
+          "icon": "images/watchdog.svg"
+        }
+      ]
+    },
+    "views": {
+      "powershellWatchdog": [
+        {
+          "type": "webview",
+          "name": "Live dashboard",
+          "id": "powershellWatchdog.dashboardView"
+        }
+      ]
     }
   },
   "devDependencies": {

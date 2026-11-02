@@ -24,6 +24,6 @@ test('every declared setting has machine scope and agrees with the product defau
   assert.equal(Object.keys(properties).length, Object.keys(defaults).length);
   for (const [key, value] of Object.entries(defaults)) {
     assert.equal(properties[`frenchexdev.powershellWatchdog.${key}`].scope, 'machine');
-    assert.equal(properties[`frenchexdev.powershellWatchdog.${key}`].default, value);
+    assert.deepEqual(properties[`frenchexdev.powershellWatchdog.${key}`].default, value);
   }
 });

@@ -5,6 +5,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { createChartTools } = require('./report-chart');
 const { reportClient, reportStyles } = require('./report-view');
+const { pruneReports } = require('./history');
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER ? value : null;
 const text = (value, limit = 2000) => typeof value === 'string' ? value.slice(0, limit) : '';
@@ -16,7 +17,9 @@ function normalizeProcess(value) {
   return { id: `${value.pid}:${createdAt}`, pid: value.pid, createdAt, kind: text(value.kind, 80) || 'unknown',
     privateBytes: finite(value.privateBytes), workingSetBytes: finite(value.workingSetBytes),
     measuredAt: time(value.measuredAt), automaticRestart: value.automaticRestart === true,
-    state: text(value.state, 80) };
+    state: text(value.state, 80), parentPid: finite(value.parentPid), rootPid: finite(value.rootPid),
+    cpuPercent: finite(value.cpuPercent), threadCount: finite(value.threadCount), handleCount: finite(value.handleCount),
+    thresholds: { warningPrivateGiB: finite(value.thresholds?.warningPrivateGiB), restartPrivateGiB: finite(value.thresholds?.restartPrivateGiB) } };
 }
 
 function normalizeEntry(value) {
@@ -24,6 +27,7 @@ function normalizeEntry(value) {
   const sample = normalizeProcess(value.sample);
   return { at: time(value.at), state: text(value.state, 80), decision: text(value.decision), mode: text(value.mode, 80),
     warningPrivateGiB: finite(value.warningPrivateGiB), restartPrivateGiB: finite(value.restartPrivateGiB),
+    sessionId: text(value.sessionId, 80) || null, profile: text(value.profile, 80) || null,
     sampleIntervalSeconds: finite(value.sampleIntervalSeconds) || null,
     processCount: finite(value.processCount), complete: typeof value.complete === 'boolean' ? value.complete : null,
     omittedProcesses: finite(value.omittedProcesses), collectionErrors: finite(value.collectionErrors), sample,
@@ -91,7 +95,8 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
     entries, series: [...series.values()].sort((left, right) => (right.peakPrivateBytes ?? -1) - (left.peakPrivateBytes ?? -1)), events,
     quality: { filesRead: retained.filesRead || 0, bytesRead: retained.bytesRead || 0, invalidLines: retained.invalidLines || 0,
       invalidEntries, duplicates, issues, incompleteEntries, inferredInterval,
-      inferredCadence: entries.some((entry) => !entry.sampleIntervalSeconds), journalError: text(snapshot.journalError) || null } };
+      inferredCadence: entries.some((entry) => !entry.sampleIntervalSeconds), journalError: text(snapshot.journalError) || null,
+      historyScope: retained.scope === 'workspace' ? 'workspace' : 'window' } };
 }
 
 function renderReportHtml(model) {
@@ -110,12 +115,12 @@ function renderReportHtml(model) {
 <div class="columns"><section class="panel"><h2>Largest observed peaks</h2><p>Private committed memory · per process identity</p><div id="ranking"></div></section>
 <section class="panel"><h2>Recorded events</h2><p>State changes, memory warnings and restart outcomes.</p><div id="events"></div><div class="pager"><button id="events-prev" type="button">Previous</button><span id="events-page"></span><button id="events-next" type="button">Next</button></div></section></div>
 <section class="panel"><h2>Current process inventory</h2><p id="inventory-note"></p><div class="table-wrap"><table><thead><tr><th>PID / created</th><th>Kind</th><th>Private</th><th>Resident</th><th>Automatic restart</th></tr></thead><tbody id="inventory"></tbody></table></div></section>
-<section class="panel"><h2>Environment & interpretation</h2><dl id="environment"></dl><ul><li>Scope: this VS Code window, its terminals and owned pwsh children.</li><li>Thresholds apply to each process. Private and resident memory are never added together.</li><li>Ordinary terminals and child processes use alerts only. Automatic restart is restricted to verified Editor Services.</li><li>Historical inventories retain at most the 20 largest processes per collection; the separate Editor Services sample can provide additional evidence.</li><li>Missing measurements are gaps, not zero. Peaks describe retained observations, not an exhaustive lifetime maximum.</li><li>This is a point-in-time export. Run the command again for an updated report.</li></ul></section>
+<section class="panel"><h2>Environment & interpretation</h2><dl id="environment"></dl><ul><li>Current inventory: this VS Code window, its terminals and owned pwsh children. Persistent history can include earlier sessions of the same workspace.</li><li>Thresholds apply to each process. Private and resident memory are never added together.</li><li>Ordinary terminals and child processes use alerts only. Automatic restart is restricted to verified Editor Services.</li><li>Historical inventories retain at most the 20 largest processes per collection; the separate Editor Services sample can provide additional evidence.</li><li>Missing measurements are gaps, not zero. Peaks describe retained observations, not an exhaustive lifetime maximum.</li><li>This is a point-in-time export. Run the command again for an updated report.</li></ul></section>
 <footer>Generated locally · No network requests · 1 GiB = 1,073,741,824 bytes</footer></main>
 <script id="report-data" type="application/json">${data}</script><script nonce="${nonce}">(${reportClient.toString()})((${createChartTools.toString()})());</script></body></html>`;
 }
 
-async function exportVisualReport({ journal, getSnapshot, environment, storagePath, globalStoragePath, openExternal, onOpenFailure }) {
+async function exportVisualReport({ journal, getSnapshot, environment, storagePath, globalStoragePath, openReport, onOpenFailure }) {
   let retained;
   try { retained = await journal.readRetainedHistory(); }
   catch { retained = { entries: [], issues: [{ file: 'journal', code: 'unreadable' }] }; }
@@ -123,9 +128,11 @@ async function exportVisualReport({ journal, getSnapshot, environment, storagePa
   const directory = path.join(storagePath || globalStoragePath, 'diagnostic-reports');
   await fs.mkdir(directory, { recursive: true });
   const filePath = path.join(directory, `watchdog-${model.generatedAt.replace(/[:.]/g, '-')}-${randomUUID()}.html`);
-  await fs.writeFile(filePath, renderReportHtml(model), { encoding: 'utf8', flag: 'wx' });
+  const html = renderReportHtml(model);
+  await pruneReports(directory, getSnapshot().policy, Buffer.byteLength(html));
+  await fs.writeFile(filePath, html, { encoding: 'utf8', flag: 'wx' });
   let opened = false;
-  try { opened = await openExternal(filePath) === true; } catch { /* Keep the successfully written report. */ }
+  try { opened = await openReport(filePath, html) === true; } catch { /* Keep the successfully written report. */ }
   if (!opened) await onOpenFailure(filePath);
   return { filePath, opened };
 }

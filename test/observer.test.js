@@ -92,3 +92,16 @@ test('invalid or unknown memory is rejected rather than interpreted as zero', ()
     assert.equal(validSample({ ...sample(10), ...invalid }), false);
   }
 });
+
+test('terminal navigation uses normalized creation identity and refuses closed or stale terminals', async () => {
+  let shown = 0; const item = { ...terminal(10), name: 'A terminal', show() { shown++; } };
+  const vscode = { window: { terminals: [item] } };
+  const observer = new WindowProcessObserver(vscode, { hostPid: 42, collectorExecutable: 'pwsh',
+    resolveEditor: async () => ({ state: 'waiting' }),
+    collect: async () => inventory([{ ...sample(10), createdAt: '2026-10-29T00:00:00.1234567Z', cpuTimeMs: -1, threadCount: null, handleCount: 25 }]) });
+  const result = await observer.observe(1000);
+  assert.equal(result.inventory.processes[0].cpuTimeMs, null); assert.equal(result.inventory.processes[0].handleCount, 25);
+  assert.equal(observer.showTerminal('10:2026-10-29T00:00:00.123Z'), true); assert.equal(shown, 1);
+  assert.equal(observer.showTerminal('10:2026-10-29T01:00:00.123Z'), false);
+  item.exitStatus = { code: 0 }; assert.equal(observer.showTerminal('10:2026-10-29T00:00:00.123Z'), false);
+});

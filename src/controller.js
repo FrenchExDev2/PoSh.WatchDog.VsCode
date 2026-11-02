@@ -1,7 +1,8 @@
 'use strict';
 
-const { PolicyEngine, defaults, validatePolicy, identityKey } = require('./policy');
+const { PolicyEngine, defaults, validatePolicy, identityKey, processPolicy } = require('./policy');
 const { withDeadline } = require('./collector');
+const { TrendTracker } = require('./trends');
 
 class WatchdogController {
   constructor(dependencies, policy = defaults, persisted = {}) {
@@ -23,6 +24,13 @@ class WatchdogController {
     this.pendingCommand = false;
     this.timer = null;
     this.abort = new AbortController();
+    this.trends = new TrendTracker();
+    this.restartIntent = null;
+    this.cancelledIdentity = typeof persisted.cancelledIdentity === 'string' ? persisted.cancelledIdentity : null;
+    this.postponeUntil = Number.isFinite(persisted.postponeUntil) ? persisted.postponeUntil : 0;
+    this.target = null;
+    this.health = { lastStartedAt: null, lastCompletedAt: null, lastSuccessAt: null, durationMs: null,
+      nextCollectionAt: null, consecutiveErrors: 0, lastError: null, collecting: false };
   }
 
   snapshot() {
@@ -37,8 +45,95 @@ class WatchdogController {
       restartOutcome: this.restartOutcome, automaticRestarts: this.engine.restarts.length,
       cooldownUntil: this.engine.cooldownUntil, suspendUntil: this.engine.suspendUntil,
       pendingCommand: this.pendingCommand, journalError: this.dependencies.journal.error,
-      history: [...this.dependencies.journal.history],
+      history: this.dependencies.journal.history.filter((entry) => Date.parse(entry.at) >= this.now() - this.engine.policy.historyRetentionDays * 86400_000),
+      profile: this.engine.policy.profile, postponeUntil: this.postponeUntil,
+      restartCountdown: this.restartIntent ? { identity: this.restartIntent.identity, deadline: this.restartIntent.deadline,
+        remainingSeconds: Math.max(0, Math.ceil((this.restartIntent.deadline - this.now()) / 1000)) } : null,
+      health: this.healthSnapshot(),
     };
+  }
+
+  /** Explain collection health and every currently known automatic restart blocker. */
+  healthSnapshot() {
+    const now = this.now();
+    const policy = this.engine.policy;
+    const activity = this.activity(this.target);
+    const reasons = [];
+    if (validatePolicy(policy).length) reasons.push('invalidPolicy');
+    if (!policy.enabled) reasons.push('disabled');
+    if (policy.mode !== 'automatic') reasons.push('notifyOnly');
+    if (!this.sample) reasons.push('noVerifiedEditorSession');
+    if (this.engine.suspendUntil > now) reasons.push('monitoringSuspended');
+    if (this.engine.suspendedReason) reasons.push(this.engine.suspendedReason);
+    if (this.engine.cooldownUntil > now) reasons.push('cooldown');
+    if (this.postponeUntil > now) reasons.push('restartPostponed');
+    if (this.sample && this.cancelledIdentity === identityKey(this.sample)) reasons.push('restartCancelledForThisEpisode');
+    if (policy.deferWhileDebugging && this.dependencies.debugging?.()) reasons.push('powerShellDebugging');
+    if (policy.deferWhileRunningCommands && activity.state === 'busy') reasons.push('commandRunning');
+    if (policy.requireKnownIdle && activity.state !== 'idle') reasons.push('verifiedIdleRequired');
+    if (this.pendingCommand) reasons.push('restartCommandPending');
+    const stale = this.health.lastSuccessAt === null || now - this.health.lastSuccessAt >
+      (policy.sampleIntervalSeconds + policy.collectTimeoutSeconds) * 2500;
+    if (stale) reasons.push('measurementStaleOrMissing');
+    return { ...this.health, stale, activity, automaticRestartBlockedBy: reasons,
+      inventoryComplete: this.inventory?.complete ?? false, editorAssociation: this.inventory?.editorIssue || (this.sample ? 'verified' : 'unavailable'),
+      historyError: this.dependencies.journal.error || null };
+  }
+
+  activity(target) { return this.dependencies.activity?.(target) || { state: 'unknown', source: 'unavailable' }; }
+
+  activityBlocks(target) {
+    const state = this.activity(target).state;
+    return this.engine.policy.deferWhileRunningCommands && state === 'busy' || this.engine.policy.requireKnownIdle && state !== 'idle';
+  }
+
+  /** Cancel stale countdowns and evidence when a known terminal activity signal changes. */
+  activityChanged(terminal) {
+    if (terminal && terminal !== this.target?.terminal) return;
+    this.revision++; this.restartIntent = null; this.engine.resetSeries();
+    this.publish('deferred', 'Activity changed; fresh measurements are required before automatic restart.');
+    void this.record(this.detail).catch(() => {});
+  }
+
+  async cancelRestart() {
+    if (!this.restartIntent) return false;
+    this.cancelledIdentity = this.restartIntent.identity; this.restartIntent = null; this.revision++;
+    this.engine.resetSeries();
+    this.publish('deferred', 'Automatic restart cancelled for this high-memory episode.');
+    await this.persist(); await this.record(this.detail); return true;
+  }
+
+  async postponeRestart(minutes = 5) {
+    if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 10080) throw new Error('Invalid postponement.');
+    this.postponeUntil = this.now() + minutes * 60_000;
+    this.restartIntent = null; this.revision++; this.engine.resetSeries();
+    this.publish('deferred', `Automatic restart postponed for ${minutes} minutes; monitoring continues.`);
+    await this.persist(); await this.record(this.detail);
+  }
+
+  async restartNow() {
+    if (!this.restartIntent) return false;
+    this.restartIntent.deadline = this.now();
+    await this.tick(); return true;
+  }
+
+  async automaticRestart(measured) {
+    const identity = identityKey(measured.sample);
+    if (identity === this.cancelledIdentity || this.postponeUntil > this.now()) {
+      this.publish('deferred', identity === this.cancelledIdentity ? 'Automatic restart cancelled for this episode.' : 'Automatic restart postponed; monitoring continues.'); return;
+    }
+    if (!this.engine.policy.restartGraceSeconds) return this.restart(measured, true);
+    if (!this.restartIntent || this.restartIntent.identity !== identity || this.restartIntent.revision !== this.revision) {
+      this.restartIntent = { identity, revision: this.revision, deadline: this.now() + this.engine.policy.restartGraceSeconds * 1000 };
+      this.dependencies.notice?.('countdown', `Editor Services restart in ${this.engine.policy.restartGraceSeconds} seconds. Session state will be lost.`);
+    }
+    if (this.restartIntent.deadline <= this.now()) {
+      const intent = this.restartIntent;
+      try { return await this.restart(measured, true); }
+      finally { if (this.restartIntent === intent) this.restartIntent = null; }
+    }
+    this.publish('countdown', `Editor Services restart in ${Math.ceil((this.restartIntent.deadline - this.now()) / 1000)} seconds; cancel or postpone from Watchdog.`);
+    await this.record(this.detail);
   }
 
   publish(state, detail) {
@@ -56,14 +151,15 @@ class WatchdogController {
     this.dependencies.onChange?.(this.snapshot());
   }
 
-  async persist() { await this.dependencies.store?.(this.engine.persist()); }
+  async persist() { await this.dependencies.store?.({ ...this.engine.persist(), cancelledIdentity: this.cancelledIdentity, postponeUntil: this.postponeUntil }); }
 
   async record(decision) {
     // Only allowlisted product data enters history or disk logs.
     await this.dependencies.journal.append({
       at: new Date(this.now()).toISOString(), state: this.state, decision,
-      sample: this.sample, warningPrivateGiB: this.engine.policy.warningPrivateGiB,
-      restartPrivateGiB: this.engine.policy.restartPrivateGiB,
+      sample: this.sample, warningPrivateGiB: processPolicy(this.engine.policy).warningPrivateGiB,
+      restartPrivateGiB: processPolicy(this.engine.policy).restartPrivateGiB,
+      profile: this.engine.policy.profile,
       mode: this.engine.policy.mode, consecutiveSamples: this.engine.count,
       sampleIntervalSeconds: this.engine.policy.sampleIntervalSeconds,
       ...(this.inventory ? { processCount: this.inventory.processes.length, complete: this.inventory.complete,
@@ -74,6 +170,7 @@ class WatchdogController {
   }
 
   configure(policy) {
+    this.restartIntent = null; this.trends.clear();
     this.revision++;
     this.engine.configure(policy);
     this.sample = null;
@@ -82,26 +179,53 @@ class WatchdogController {
     const errors = validatePolicy(policy);
     this.publish(errors.length ? 'error' : policy.enabled ? 'waiting' : 'disabled',
       errors.length ? errors.join(' ') : policy.enabled ? 'Policy changed; fresh measurement required.' : 'Monitoring disabled.');
+    // Configuration events are synchronous; surface storage failures without an unhandled rejection.
+    void this.record(this.detail).catch(() => {
+      this.dependencies.journal.error = 'Policy change could not be recorded.';
+    });
   }
 
   async suspend(minutes) {
+    this.restartIntent = null; this.trends.clear();
     this.revision++;
     this.engine.suspend(this.now() + minutes * 60_000);
+    this.sample = null;
     this.inventory = null;
     this.processEngines.clear();
-    await this.persist();
     this.publish('suspended', `Monitoring suspended for ${minutes} minutes.`);
+    await this.record(this.detail);
+    await this.persist();
   }
 
   async resume() {
+    this.restartIntent = null; this.cancelledIdentity = null; this.postponeUntil = 0; this.trends.clear();
     this.revision++;
     this.engine.resume();
+    this.sample = null;
+    this.inventory = null;
     this.processEngines.clear();
-    await this.persist();
     this.publish('waiting', 'Resumed; fresh measurements required.');
+    await this.record(this.detail);
+    await this.persist();
   }
 
   async measure() {
+    this.health.lastStartedAt = this.now(); this.health.collecting = true;
+    this.dependencies.onChange?.(this.snapshot());
+    try {
+      const result = await this.collectMeasurement();
+      this.health.lastSuccessAt = this.now(); this.health.consecutiveErrors = 0; this.health.lastError = null;
+      return result;
+    } catch (error) {
+      this.health.consecutiveErrors++; this.health.lastError = ['timeout', 'cancelled', 'unsupported', 'ambiguous'].includes(error.code) ? error.code : 'collection';
+      throw error;
+    } finally {
+      this.health.lastCompletedAt = this.now(); this.health.durationMs = Math.max(0, this.now() - this.health.lastStartedAt);
+      this.health.collecting = false;
+    }
+  }
+
+  async collectMeasurement() {
     const milliseconds = this.engine.policy.collectTimeoutSeconds * 1000;
     if (this.dependencies.observe) return withDeadline(() => this.dependencies.observe(milliseconds, this.abort.signal), milliseconds, this.abort.signal);
     const started = this.now();
@@ -118,7 +242,11 @@ class WatchdogController {
     const live = new Set();
     const warnings = [];
     this.processState = 'normal';
+    this.trends.update(inventory.processes, this.engine.policy, this.now());
     for (const sample of inventory.processes) {
+      const effective = processPolicy(this.engine.policy, sample.kind);
+      sample.thresholds = { warningPrivateGiB: effective.warningPrivateGiB, restartPrivateGiB: effective.restartPrivateGiB };
+      if (sample.growth?.notify) this.dependencies.notice?.('warning', `pwsh PID ${sample.pid} grew by ${sample.growth.deltaMiB.toFixed(0)} MiB in ${sample.growth.observedSeconds.toFixed(0)} seconds. This is a growth alert, not proof of a leak.`);
       if (sample.automaticRestart) continue;
       const key = identityKey(sample);
       live.add(key);
@@ -152,14 +280,18 @@ class WatchdogController {
         this.sample = null;
         this.inventory = null;
         this.processEngines.clear();
+        const changed = this.state !== decision.state;
         this.publish(decision.state, decision.detail);
+        if (changed) await this.record(decision.detail);
         return this.snapshot();
       }
       const measured = await this.measure();
       if (this.disposed || revision !== this.revision) return this.snapshot();
       this.updateInventory(measured.inventory);
+      this.target = measured.target;
       this.sample = measured.sample;
       if (!measured.sample) {
+        this.restartIntent = null;
         this.engine.resetSeries();
         this.publish(measured.target?.state || 'waiting', measured.inventory?.processes.length ?
           'Terminal and child pwsh processes use memory alerts; no Editor Services restart target is active.' :
@@ -168,17 +300,21 @@ class WatchdogController {
         return this.snapshot();
       }
       this.lastValid = measured.sample;
-      const decision = this.engine.evaluate(measured.sample, this.now(), { debugging: this.dependencies.debugging() });
+      const effective = processPolicy(this.engine.policy, measured.sample.kind);
+      if (measured.sample.privateBytes < effective.restartPrivateGiB * (1024 ** 3)) this.cancelledIdentity = null;
+      const decision = this.engine.evaluate(measured.sample, this.now(), { debugging: this.dependencies.debugging(), activity: this.activity(measured.target).state });
+      if (!decision.restart) this.restartIntent = null;
       const priorState = this.state;
       this.publish(decision.state, decision.detail);
       await this.persist();
       await this.record(decision.detail);
       if (decision.notifyWarning) this.dependencies.notice?.('warning', `Editor Services pwsh PID ${measured.sample.pid} exceeds the private memory warning threshold.`);
       if (decision.state === 'suspended' && priorState !== 'suspended') this.dependencies.notice?.('warning', decision.detail);
-      if (decision.restart && revision === this.revision) await this.restart(measured, true);
+      if (decision.restart && revision === this.revision) await this.automaticRestart(measured);
     } catch (error) {
       if (this.disposed || revision !== this.revision) return this.snapshot();
       this.sample = null;
+      this.restartIntent = null; this.trends.clear();
       this.inventory = null;
       this.processEngines.clear();
       this.engine.resetSeries();
@@ -197,6 +333,7 @@ class WatchdogController {
   async manualRestart() {
     if (this.busy || this.disposed || this.pendingCommand) return false;
     if (validatePolicy(this.engine.policy).length) return false;
+    this.restartIntent = null; this.revision++;
     this.busy = true;
     try {
       const measured = await this.measure();
@@ -220,15 +357,16 @@ class WatchdogController {
       return false;
     }
     if (revision !== this.revision || (automatic && (!this.engine.policy.enabled || this.engine.policy.mode !== 'automatic' ||
-      fresh.sample.privateBytes < this.engine.policy.restartPrivateGiB * (1024 ** 3) ||
+      fresh.sample.privateBytes < processPolicy(this.engine.policy, fresh.sample.kind).restartPrivateGiB * (1024 ** 3) ||
       this.engine.suspendUntil > this.now() || this.engine.suspendedReason ||
+      this.activityBlocks(fresh.target) ||
       (this.engine.policy.deferWhileDebugging && this.dependencies.debugging())))) {
       this.engine.resetSeries();
       this.publish('deferred', 'Restart deferred after the final activity check.');
       return false;
     }
     const commands = await this.dependencies.commands();
-    if (revision !== this.revision || this.disposed || (automatic && this.engine.policy.deferWhileDebugging && this.dependencies.debugging())) {
+    if (revision !== this.revision || this.disposed || (automatic && (this.activityBlocks(fresh.target) || this.engine.policy.deferWhileDebugging && this.dependencies.debugging()))) {
       this.engine.resetSeries();
       return false;
     }
@@ -241,15 +379,35 @@ class WatchdogController {
       return false;
     }
     this.publish('restarting', 'Requesting a replacement PowerShell session.');
-    this.engine.restartRequested(this.now(), automatic);
+    const requestedAt = this.now();
+    const requestIndex = this.engine.restarts.length;
+    const previousReason = this.engine.suspendedReason;
+    const pendingReason = 'Restart interrupted or pending; inspect the session and resume.';
+    this.engine.restartRequested(requestedAt, automatic);
     // Persist the attempt before dispatch. A reload during restart must not bypass quota or unlock another request.
-    this.engine.suspendedReason = 'Restart interrupted or pending; inspect the session and resume.';
+    this.engine.suspendedReason = pendingReason;
     await this.persist();
+    // User choices and debugger activity can change while storage is pending.
+    if (revision !== this.revision || this.disposed || (automatic && (!this.engine.policy.enabled ||
+      this.engine.policy.mode !== 'automatic' || this.engine.suspendUntil > this.now() ||
+      this.activityBlocks(fresh.target) ||
+      (this.engine.policy.deferWhileDebugging && this.dependencies.debugging())))) {
+      if (automatic && this.engine.restarts[requestIndex] === requestedAt) this.engine.restarts.splice(requestIndex, 1);
+      if (this.engine.suspendedReason === pendingReason) this.engine.suspendedReason = previousReason;
+      this.engine.resetSeries();
+      if (!this.disposed && revision === this.revision) this.publish('deferred', 'Restart cancelled before dispatch; fresh measurements required.');
+      await this.persist();
+      if (!this.disposed) await this.record('Restart cancelled before dispatch.');
+      return false;
+    }
     this.pendingCommand = true;
     const deadline = this.now() + this.engine.policy.restartTimeoutSeconds * 1000;
     let outcome = 'expired';
     try {
-      const request = Promise.resolve().then(() => this.dependencies.restart());
+      let request;
+      // Dispatch synchronously after the final guard; a queued microtask would reopen the race.
+      try { request = Promise.resolve(this.dependencies.restart()); }
+      catch (error) { this.pendingCommand = false; throw error; }
       request.then(() => { this.pendingCommand = false; }, () => { this.pendingCommand = false; });
       await withDeadline(() => request, Math.max(1, deadline - this.now()), this.abort.signal);
       while (!this.disposed && this.now() < deadline) {
@@ -286,13 +444,17 @@ class WatchdogController {
       try { await this.tick(); } catch { this.publish('error', 'Watchdog storage or orchestration error.'); }
       if (!this.disposed) {
         const seconds = this.engine.policy.sampleIntervalSeconds;
-        this.timer = setTimeout(cycle, Number.isFinite(seconds) && seconds > 0 && seconds * 1000 <= 2 ** 31 - 1 ? seconds * 1000 : 15_000);
+        let delay = Number.isFinite(seconds) && seconds > 0 && seconds * 1000 <= 2 ** 31 - 1 ? seconds * 1000 : 15_000;
+        if (this.restartIntent) delay = Math.min(delay, Math.max(1, this.restartIntent.deadline - this.now()));
+        this.health.nextCollectionAt = this.now() + delay;
+        this.dependencies.onChange?.(this.snapshot());
+        this.timer = setTimeout(cycle, delay);
       }
     };
     void cycle();
   }
 
-  dispose() { this.disposed = true; clearTimeout(this.timer); this.abort.abort(); }
+  dispose() { this.disposed = true; this.restartIntent = null; clearTimeout(this.timer); this.abort.abort(); }
 }
 
 module.exports = { WatchdogController };

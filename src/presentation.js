@@ -3,7 +3,7 @@
 const { GiB } = require('./policy');
 const formatMemory = (bytes) => `${(bytes / GiB).toFixed(2)} GiB`;
 const stateLabels = { normal: 'Monitoring', warning: 'Memory warning', confirmed: 'High memory', deferred: 'Editor restart deferred',
-  restarting: 'Restarting editor session', cooldown: 'Editor session stabilizing', disabled: 'Monitoring disabled',
+  countdown: 'Editor restart scheduled', restarting: 'Restarting editor session', cooldown: 'Editor session stabilizing', disabled: 'Monitoring disabled',
   suspended: 'Monitoring suspended', error: 'Measurement unavailable', ambiguous: 'Editor session ambiguous',
   unsupported: 'Environment unsupported', waiting: 'Waiting for pwsh in this window' };
 

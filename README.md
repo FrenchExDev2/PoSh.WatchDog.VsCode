@@ -1,51 +1,109 @@
 # PowerShell Memory Watchdog
 
-A Windows Desktop VS Code extension that measures **private committed memory** and resident memory of the `pwsh` instances launched by **each VS Code window**: integrated terminals, their nested PowerShell processes, and processes launched by that window's extension host. Runs in the local Node extension host; one independent, profile-free PowerShell 7 collector measures the whole window inventory. No runtime npm dependencies.
+Monitor the memory used by PowerShell processes in each VS Code window. Get alerts for terminals and nested `pwsh` processes, and optionally restart a verified PowerShell Editor Services session when its memory stays too high.
+
+Windows Desktop only. Runs locally, with no runtime npm dependencies or telemetry.
 
 ## Install
 
-Install `dist/powershell-watchdog-0.3.0.vsix` using **Extensions: Install from VSIX…** in VS Code Stable or Insiders. Requires VS Code 1.114 or later, Windows and an independent PowerShell 7 Core collector. Ordinary `pwsh` monitoring works without the Microsoft PowerShell extension or an open `.ps1` file. Reload the window after upgrading an already active watchdog.
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.4.0.vsix`, then reload the window if upgrading.
 
-Automatic Editor Services restart additionally requires **ms-vscode.powershell 2026.1.2** and its verified window association. Unknown extension versions and ambiguous Editor Services do not disable ordinary process measurements or alerts. Remote windows, the browser, Linux and macOS remain unsupported. Actual editor qualification is documented in `QUALIFICATION.md`.
+Requires **VS Code 1.114+** (Stable or Insiders), **Windows** and **PowerShell 7 Core** for the independent collector. Monitoring ordinary processes needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
+
+Automatic Editor Services restart requires **ms-vscode.powershell 2026.1.2** and a verified association with the current window. Unknown versions or ambiguous associations leave monitoring and alerts available. Remote windows, browsers, Linux and macOS are unsupported.
 
 ## Use
 
-The status bar shows the **number of measured pwsh instances and their total private memory**, for example `pwsh 3 · 0.42 GiB total · Monitoring`. `No pwsh in this window` means a completed collection found none; `Discovering pwsh` means discovery is still incomplete. Collection errors say `Measurement unavailable`. An incomplete total is prefixed with `≥`. Hover for per-process private/resident memory, PID, creation time, current action policy and last collection age. Click for actions or open **PowerShell Watchdog: Show Diagnostics** for the full process list.
+The status bar shows the process count and total private committed memory:
 
-Defaults: 15-second collection interval, 4 GiB warning, 8 GiB restart threshold, three consecutive high samples, 3-second collection deadline, 45-second restart deadline, 120-second stabilization and at most three automatic requests in a rolling hour. One GiB is 1,073,741,824 bytes. Private and resident memory are never added together.
+`pwsh 3 · 0.42 GiB total · Monitoring`
 
-**Thresholds apply to each process independently.** Adding several small processes together does not qualify one process for restart. **The default mode is `automatic` for verified Editor Services; ordinary terminals and child pwsh processes always use alerts only.** Their threshold crossings never invoke `PowerShell.RestartSession` or close a terminal. The manual restart command is explicitly named **Restart Editor Services Session…**. An editor restart discards editor-session variables, modules and state and may interrupt an interactive editor command. PowerShell debugging defers automatic requests; absence of a debugger does not establish an idle console. Use `notifyOnly` for alerts on every instance.
+Hover for per-process measurements; click for actions. `≥` marks an incomplete total. Discovery, collection errors and a completed inventory with no processes have distinct status messages.
 
-Configure `frenchexdev.powershellWatchdog.*` in **user settings**. All settings are machine scoped; workspace and folder overrides are ignored explicitly. The settings and their defaults match `BESOIN.md`. Invalid policies disable automatic decisions and show an explanation. Disable survives a window reload. Quota, suspension, cooldown and unsuccessful/pending attempts are retained in workspace state; **Resume** is required after an automatic failure or quota suspension. Resume retains the rolling quota and does not authorize a second request while a timed-out command remains pending.
+Thresholds apply **to each process**, independently of the displayed total. Private and resident memory are reported separately and never added together.
 
-## Per-window ownership and editor recovery
+| Default | Value |
+| --- | --- |
+| Collection interval | 15 seconds |
+| Warning threshold | 4 GiB per process |
+| Restart threshold | 8 GiB per process, for 3 consecutive samples |
+| Restart countdown | 30 seconds, cancellable |
+| Stabilization after restart | 120 seconds |
+| Automatic request limit | 3 per rolling hour |
 
-Ownership roots come from this window's `Terminal.processId` values and its extension-host PID. The collector walks the Windows process graph to include their live `pwsh.exe` descendants. Parent creation times must precede child creation times; traversal stops at the first Code executable boundary. This prevents walking through another editor process into a different window's tree. Ordinary PowerShell started outside these ownership roots is excluded. Detached/orphaned processes with no surviving verifiable ownership chain cannot be associated. The collector excludes itself.
+One GiB is 1,073,741,824 bytes.
 
-Editor restart permission is stricter than read-only measurement. The adapter, derived from the shipped Microsoft extension, reads its public `getLogUri()`/`getStorageUri()` and matches exactly one current-window terminal's module and session-launch artifacts. The collector independently checks these artifacts before declaring it an automatic restart target. Debug-only and other terminals remain alert-only. Full command lines are neither returned nor logged. A changed creation time invalidates the old process's counters, including PID reuse.
+## Live dashboard
 
-A restart is requested only through the current window's registered `PowerShell.RestartSession`. A normal command return is insufficient: a different PID/creation-time identity must be associated and measured before the overall deadline. Failed, expired or interrupted requests suspend automatic actions. Persistently high memory after stabilization also suspends them. There is no automatic forced termination, global process selection, elevation, profile change or telemetry.
+Open the **PowerShell Watchdog** activity-bar view or run **PowerShell Watchdog: Open Live Dashboard** for a larger editor tab. Both receive the same live measurements.
 
-## Diagnostics and budgets
+- Private and resident memory curves with process selection, creation-time identities and explicit collection gaps.
+- Processes grouped by terminal/root, sorted by private memory, CPU, PID or process tree; filter by Editor Services, terminal or child.
+- Private memory, resident memory, CPU, threads, handles, growth and observed activity. **Open** focuses the process's current terminal when it is still available.
+- Workload profile, scheduled restart actions, collection health and recent persisted events.
 
-Diagnostics opens a JSON document containing the current policy, all measured processes with kind and restart capability, completeness/errors, the previous inventory, Editor Services identity, decisions and environment versions. Collection errors never become zero memory. Inventory is bounded to 256 pwsh instances and 255 terminal roots plus the extension host; overflow is explicit. History retains 200 collections, each with the 20 largest measured processes and an omitted count. The journal uses VS Code's per-window extension log directory: `watchdog.0.jsonl` through `watchdog.2.jsonl`, each at most 5 MiB. Storage failures are visible in diagnostics. The shared extension host must itself remain responsive.
+CPU is derived from cumulative processor time between valid observations: **100% means one logical core**, so multithreaded processes can exceed 100%. The first observation and collection gaps have unknown CPU. Optional metric failures leave those values unknown without discarding a valid memory sample. The tree contains owned **pwsh** processes; non-PowerShell parents appear only as parent/root PIDs.
 
-## Visual diagnostic report
+Growth alerts default to **+500 MiB over five minutes**. They require at least three observations, a complete time window and at least 75% nondecreasing steps. Alerts are emitted once per sustained episode, independently of restart thresholds. A growth alert **does not establish a memory leak**. Process exit, PID reuse, invalid collection, policy change or a collection gap resets trend evidence; at most 1,024 observations are kept per process.
 
-Run **PowerShell Watchdog: Open Visual Diagnostics (HTML)** from the command palette or **Visual diagnostics (HTML)** from the status-bar menu. It saves a uniquely dated HTML file under `diagnostic-reports` in the extension's workspace storage, or global extension storage when no workspace is open, then requests external opening. The system association for `.html` normally opens the browser. If opening fails, a notification gives the saved path and **Reveal report** action. Each export is retained; generating another report does not overwrite an earlier one.
+## Workload profiles and thresholds
 
-The self-contained file works offline and includes current state and process inventory, private/resident memory curves with a process selector and hover values, historical per-process thresholds, observed peak rankings, paginated recorded events and environment versions. Uncheck **Show per-process thresholds** to inspect smaller memory changes. It is a point-in-time report; rerun the command to update it. The JSON diagnostic remains available separately.
+**Select Workload Profile…** or the dashboard selects `development` (×1), `tests` (×1.5) or `build` (×2). The multiplier applies to the global warning/high thresholds. Explicit `processThresholds` values are absolute GiB and take precedence for that kind:
 
-Exports read only the three journal files in this window's current log directory, at most 15 MiB, and merge them with the 200-entry in-memory history. They do not search previous VS Code log sessions or other windows. Missing/unreadable files, malformed records and capped files are reported. Retained historical inventories contain the 20 largest processes, with an additional Editor Services sample when available: absent samples are gaps, incomplete current totals are lower bounds, and recorded peaks are not exhaustive lifetime maxima. Older journal entries lack the sampling cadence; their long-gap detection uses the median retained interval. Plot reduction preserves peaks and interruptions while the complete normalized retained data remains embedded in the HTML. No collection, restart or policy change is requested by exporting.
+```json
+{
+  "frenchexdev.powershellWatchdog.profile": "tests",
+  "frenchexdev.powershellWatchdog.processThresholds": {
+    "editorServices": { "warningPrivateGiB": 4, "restartPrivateGiB": 8 },
+    "terminal": { "warningPrivateGiB": 6, "restartPrivateGiB": 12 },
+    "child": { "warningPrivateGiB": 2, "restartPrivateGiB": 4 }
+  }
+}
+```
 
-`node test/run-report-browser.js` exercises an existing Edge/Chromium browser with a separate headless profile and near-15-MiB prepared journals, without downloads. Set `WATCHDOG_TEST_BROWSER` for another installed Chromium executable. It verifies offline rendering, PID reuse, gaps, escaping, controls and narrow layout; JSON results are written to `verification/report-browser.json`, with sample HTML and screenshots under `.sandbox/report-*`.
+Terminal/child high thresholds remain alert-only. Profile and threshold changes require fresh measurements and cancel any existing countdown. All settings remain user-machine scoped.
 
-## Develop and qualify
+## Restart policy
 
-For automated Marketplace publication from a version tag, see [RELEASING.md](RELEASING.md).
+The default mode is `automatic` **for verified Editor Services only**. Ordinary terminals and child processes always receive alerts only. Watchdog never forcibly terminates a process or closes a terminal.
 
-Node 22+ is required for the development tooling. Install locked tools with `npm ci --ignore-scripts`, run `node --test test/*.test.js`, and package with `node node_modules/@vscode/vsce/vsce package --no-dependencies --out dist/`. Follow the repository's QuietCli instructions when running commands as an agent.
+**Restarting Editor Services discards its variables, modules and session state, and may interrupt a command.** PowerShell debugging defers automatic restart requests; an inactive debugger does not mean the console is idle. Choose `notifyOnly` for alerts on every process.
 
-`test/run-integration.js` installs the current-version VSIX into a new `.sandbox/run-*` extension directory, copies the explicitly selected Microsoft extension, and runs two independent editor instances with separate user data and workspaces. Set `WATCHDOG_TEST_EXTENSION` to the installed Microsoft extension directory and `WATCHDOG_TEST_PWSH` to `pwsh.exe`, then run `node test/run-integration.js`. Select an existing Desktop executable with `WATCHDOG_TEST_VSCODE`, or download a separate test copy using `WATCHDOG_TEST_CHANNEL=insiders` (default) or `stable`. It never uses your normal VS Code profile. It first measures an ordinary terminal and its nested pwsh before explicitly starting Editor Services, checks child exit/removal, then tests isolation, debugger deferral, editor restart and independent ordinary-process warnings. Allocation is bounded to 192 MiB per Editor Services session and 192 MiB per ordinary console, with scaled thresholds. Both editors are reopened to verify persistent disable and quota. Reports go to `verification/integration-insiders.json` or `verification/integration-stable.json`, with installed runtime hashes. Sandbox files are retained for inspection. These tests do not establish the proposed stabilized <50 MiB overhead objective.
+Once high memory is confirmed, `restartGraceSeconds` starts a countdown (default 30; zero disables it). The notification and dashboard offer **Cancel this episode**, **Postpone 5 minutes** and **Restart now**. Cancel blocks further automatic requests for that process until a measured value drops below its high threshold; postponement keeps collecting. Cancellation survives profile changes and reloads; postponement survives reloads. Resume explicitly clears them while preserving quotas. Restart now shortens the countdown and still requires fresh identity, memory, activity and policy checks. The separate manual restart command retains its confirmation dialog.
 
-Sources: [Microsoft extension API](https://github.com/PowerShell/vscode-powershell/blob/main/src/features/ExternalApi.ts), [session launch implementation](https://github.com/PowerShell/vscode-powershell/blob/main/src/process.ts), [VS Code terminal API](https://code.visualstudio.com/api/references/vscode-api#Terminal), [extension host placement](https://code.visualstudio.com/api/advanced-topics/extension-host), [Windows private memory](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.privatememorysize64), [resident memory](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.workingset64). Compatibility is gated to the locally inspected release rather than inferred from the moving `main` branch.
+`deferWhileRunningCommands` defaults to true. Watchdog observes VS Code terminal shell-execution start/end events without reading command text or output. A known busy Editor Services terminal defers automatic restart and invalidates existing evidence. **Unknown activity never means idle.** Editor Services may not provide shell integration events; `requireKnownIdle: true` makes that unknown state block automatic restart as well. Ordinary terminal activity is displayed but does not grant restart authority or imply the editor is busy. Activity changes are checked again immediately before command dispatch, including while a quota save is pending.
+
+Configure `frenchexdev.powershellWatchdog.*` in **user settings**. Workspace and folder overrides are ignored. Invalid policies disable automatic decisions and explain why.
+
+The collection interval begins after each collection completes. Continuity checks allow the collector deadline plus scheduling tolerance; a collection failure or a longer gap resets consecutive samples. A pending quota save does not prevent disabling, suspending or deferring a restart before its command is sent.
+
+Failed or timed-out restart requests, persistent high memory after stabilization, and exhausted quotas suspend automatic actions. Use **Resume** to continue; it preserves the rolling quota and cannot bypass a pending request. Disabling Watchdog survives a window reload.
+
+## Diagnostics
+
+From the command palette:
+
+- **PowerShell Watchdog: Show Diagnostics** opens JSON with the policy, process inventory, decisions, errors and environment versions.
+- **PowerShell Watchdog: Open Live Dashboard** opens the live process/history/health view.
+- **PowerShell Watchdog: Open Visual Diagnostics (HTML)** saves an offline report and displays it in a VS Code editor tab. It includes memory curves, process selection, observed peaks and recorded events. Running the command again refreshes the same tab.
+- **PowerShell Watchdog: Restart Editor Services Session…** requests a manual editor-session restart.
+
+HTML reports are dated snapshots retained in the extension's storage. Generate a new report to refresh it. Exporting does not trigger collection or restart. Gaps remain visible and recorded peaks are not lifetime maxima.
+
+History now lives under the workspace extension storage's `history` directory, with a separate writer identity per activation. Reloading restores the latest 200 events for the live view; HTML exports read the retained disk history. History is **workspace-scoped across sessions**, including other windows of that same workspace, while the current inventory remains window-scoped. Empty windows use extension global storage. Historic log-session files from versions before 0.4 are not migrated. No historic consecutive-sample or CPU series can authorize a restart.
+
+`historyRetentionDays` / `historyMaxMiB` default to **14 days / 15 MiB**. Owned history segments are pruned during writes and retained-history reads. Entries outside the age limit are excluded even if their segment is newer. The oldest segments are removed first, so the retained duration may be shorter than the age limit. `reportRetentionDays` / `reportMaxMiB` default to **14 days / 20 MiB**; owned HTML exports are pruned before a new export. A single oversized export is rejected with an action error. Unrelated files and directories are preserved. Simultaneous windows can temporarily exceed a shared storage budget until the next pruning operation; cross-process transactional storage is not provided.
+
+The health view and JSON include collection start/end, duration, next scheduled collection, consecutive collection errors, stale measurements, incomplete inventories, editor association, activity source, storage errors and known automatic-restart blockers. A missing blocker is not permission to restart: threshold, continuity, quota and final checks still apply.
+
+Suspend, resume and configuration changes are recorded even without a new memory collection. Repeated paused cycles do not add duplicate state events.
+
+Only processes with a verifiable ownership chain to the current window are included. Detached processes may be excluded. Collection errors never become zero memory, and full command lines are neither returned nor logged.
+
+## Development and details
+
+Development requires Node 22+. Install tools with `npm ci --ignore-scripts`, run `node --test test/*.test.js`, and package with `node node_modules/@vscode/vsce/vsce package --no-dependencies --out dist/`. Agents must follow the repository's QuietCli instructions.
+
+- [Qualification](QUALIFICATION.md): tested environments, browser and integration evidence, and remaining limits.
+- [Release guide](RELEASING.md): automated Marketplace publication from a version tag.
+- [Changelog](CHANGELOG.md).

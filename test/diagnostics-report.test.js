@@ -26,6 +26,13 @@ test('retained disk and memory history are merged, ordered and deduplicated', ()
   assert.equal(model.quality.bytesRead, 900);
 });
 
+test('workspace history identifies sessions and retains each process effective thresholds', () => {
+  const model = buildReportModel({ snapshot: snapshot({ history: [entry(0, { sessionId: 'previous-session', profile: 'tests',
+    processes: [processSample({ thresholds: { warningPrivateGiB: 2, restartPrivateGiB: 3 } })] })] }), retained: { scope: 'workspace' } });
+  assert.equal(model.quality.historyScope, 'workspace'); assert.equal(model.entries[0].sessionId, 'previous-session');
+  assert.equal(model.entries[0].processes[0].thresholds.restartPrivateGiB, 3);
+});
+
 test('PID reuse produces independent identities and peak rankings', () => {
   const next = processSample({ createdAt: '2026-10-29T08:00:20Z', privateBytes: 3 * GiB });
   const model = buildReportModel({ snapshot: snapshot({ processes: [next], history: [entry(0), entry(30, { processes: [next] })] }) });
@@ -118,7 +125,11 @@ test('automatic exports are unique, use workspace storage and open only after a 
     const opened = [];
     const options = { journal: { readRetainedHistory: async () => ({ entries: [] }) }, getSnapshot: () => snapshot(),
       environment: {}, storagePath: path.join(directory, 'workspace'), globalStoragePath: path.join(directory, 'global'),
-      openExternal: async (file) => { assert.ok((await fs.readFile(file, 'utf8')).endsWith('</html>')); opened.push(file); return true; },
+      openReport: async (file, html) => {
+        assert.ok(html.endsWith('</html>'));
+        assert.equal(await fs.readFile(file, 'utf8'), html);
+        opened.push(file); return true;
+      },
       onOpenFailure: () => { throw new Error('Unexpected open failure.'); } };
     const first = await exportVisualReport(options); const second = await exportVisualReport(options);
     assert.notEqual(first.filePath, second.filePath);
@@ -127,12 +138,12 @@ test('automatic exports are unique, use workspace storage and open only after a 
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
-test('failed browser opening keeps the HTML and exposes its path; global storage works without a workspace', async () => {
+test('failed tab opening keeps the HTML and exposes its path; global storage works without a workspace', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'watchdog-html-'));
   try {
     let revealed;
     const result = await exportVisualReport({ journal: { readRetainedHistory: async () => { throw new Error('Denied'); } }, getSnapshot: () => snapshot(),
-      globalStoragePath: directory, openExternal: async () => { throw new Error('No application'); }, onOpenFailure: (file) => { revealed = file; } });
+      globalStoragePath: directory, openReport: async () => { throw new Error('No webview'); }, onOpenFailure: (file) => { revealed = file; } });
     assert.equal(result.opened, false); assert.equal(revealed, result.filePath);
     const html = await fs.readFile(result.filePath, 'utf8');
     assert.ok(html.includes('"code":"unreadable"'));

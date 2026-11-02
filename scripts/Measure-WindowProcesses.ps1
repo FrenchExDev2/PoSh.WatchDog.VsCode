@@ -1,4 +1,8 @@
 # Objective: Collect one bounded snapshot of this VS Code window's pwsh processes independently of those processes.
+$utf8 = [Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
 $ErrorActionPreference = 'Stop'
 try {
     if (!$IsWindows -or $PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) { throw 'UnsupportedPlatform' }
@@ -33,7 +37,13 @@ try {
                 privateBytes = $process.PrivateMemorySize64; workingSetBytes = $process.WorkingSet64
                 measuredAt = [DateTime]::UtcNow.ToString('O'); collectorPowerShellVersion = $PSVersionTable.PSVersion.ToString()
                 rootPid = $selection.RootProcessId
+                parentPid = [int]$native.ParentProcessId
+                cpuTimeMs = $null; threadCount = $null; handleCount = $null
             })
+            # Supplementary metrics must not turn a valid memory measurement into an unavailable process.
+            try { $samples[$samples.Count - 1].cpuTimeMs = $process.TotalProcessorTime.TotalMilliseconds } catch { }
+            try { $samples[$samples.Count - 1].threadCount = $process.Threads.Count } catch { }
+            try { $samples[$samples.Count - 1].handleCount = $process.HandleCount } catch { }
             if ($request.editor -and [int]$request.editor.pid -eq [int]$native.ProcessId) {
                 # Only the explicitly associated Editor Services process can authorize its restart command.
                 $editorProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($native.ProcessId)" -Property CommandLine, ExecutablePath, CreationDate

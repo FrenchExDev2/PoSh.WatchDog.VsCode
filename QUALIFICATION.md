@@ -1,8 +1,42 @@
-# Qualification — 0.3.0
+# Qualification — 0.4.0
+
+Date: **2 November 2026**. Source qualification for the live dashboard, restart countdown, growth alerts, process metrics, workload profiles, persistent history, health diagnostics and activity protection.
+
+**97 automated tests pass on the Windows host, zero failures or skipped tests.** Coverage includes the preceding audit fixes and new countdown expiry/cancellation, postponement, restart-now rechecks, PID changes, debugger/activity invalidation, cancellation during final measurement and quota persistence, strict idle mode, collection failure/recovery, independent effective thresholds, overlapping shell executions, sustained growth and bounded trend-window coverage, history reload/retention/budgets, report cleanup, terminal navigation and webview message allowlisting. Restart scenarios use controlled dependencies. The existing ownership selector also runs through PowerShell Core 7.6.9.
+
+Evidence: `%TEMP%/watchdog-release-20261102-19518856` (`tests.tap`, `tests.result.json`). Reopen the retained visible monitor with `pwsh -NoExit -File <that directory>/Watch-Features.ps1 -RunRoot <that directory>`.
+
+**Five source-integration scenarios pass in one isolated VS Code Stable 1.144.0 window on the Windows host.** Real pwsh collection measures private/resident memory, parent PID, CPU deltas, threads, handles and terminal association. The actual editor dashboard opens/reuses its tab, the activity-bar view resolves, profile changes affect fresh process thresholds, persistent history feeds HTML/JSON diagnostics, and shell execution events report busy then idle. Automatic injection was unavailable for the API-created test terminal: the test initializes VS Code's own shell-integration script in that owned shell only. No user profile or host execution policy is changed. No Microsoft PowerShell extension or automatic Editor Services restart is exercised by this new scenario. `verification/features-native.json` records the checks and isolated storage directory; `%TEMP%/watchdog-native-20261102-2d51b31f` retains runner output and the visible `Watch-NativeFeatures.ps1` monitor. This is a development-extension run, not an installed-VSIX requalification or an Insiders run.
+
+**Four browser scenario groups pass in an owned headless Edge profile.** Real DOM checks cover terminal groups, process tree/filter/navigation, private/resident curves with explicit gaps, every restart/report action, per-process report thresholds across missing measurements, workspace history scope, hostile-text escaping, empty current inventory, retained history and collection health. Desktop and 340px sidebar screenshots were inspected. No page network request, JavaScript exception or CSP error was observed. `verification/dashboard-browser.json` identifies the temporary HTML and screenshots. Fixture values are synthetic. The browser harness supplies the VS Code messaging API; actual VS Code view registration is covered separately by the source-integration scenarios.
+
+History defaults to 14 days / 15 MiB in workspace extension storage, with up to 200 live events and 20 retained processes per collection plus the separate Editor Services sample. Trend windows retain at most 1,024 observations, thinning interior points when necessary. HTML exports default to 14 days / 20 MiB, pruned on export. Concurrent writers from windows of the same workspace can temporarily exceed the shared budget until the next prune; storage has no cross-process transaction lock. Old log-session journals are not migrated. Command activity remains unknown without observed shell events; `requireKnownIdle` can block automatic restart in that case. Real leak diagnosis, long-duration stability, unavailable supplementary metrics under real ACL restrictions and automatic restart against a genuinely unresponsive Editor Services process remain unqualified.
+
+Earlier installed-VSIX and report-browser results below refer to their recorded builds. Version 0.4.0 is packaged locally after the source checks; the normal user extension installation is not changed.
+
+---
+
+# Historical qualification — 0.3.0
 
 Date: **29 October 2026**. The visual diagnostic adds an offline HTML export; collection, process ownership and restart authority keep their existing scope.
 
-## Automated checks
+## Audit fixes — 2 November 2026
+
+**79 automated tests pass on the Windows host, zero failures or skipped tests.** Twelve new regression cases cover cancellation during quota persistence (disable, notify-only, suspend, debugger start and disposal), reservation rollback, synchronous command failure, slow valid collection cadence and its long-gap boundary, retained policy events, initially disabled monitoring and event-write failure. Restart scenarios use controlled dependencies; the existing process-selector fixture also runs through native PowerShell Core.
+
+These source fixes have not been packaged or exercised in installed Desktop integration. Earlier installed-VSIX results below describe their recorded builds. Local test evidence is retained under `%TEMP%/watchdog-fix-20261102-31cd8d39` (`tests.tap`, `tests.result.json`); QuietCli RECORD: `035ffaa4120e`.
+
+## VS Code tab update — 1 November 2026
+
+Visual diagnostics now displays the exported HTML in one reusable VS Code editor webview. Repeating the command refreshes that tab; closing it permits a new tab on the next invocation. The saved HTML and its nonce-based content security policy are preserved. Scripts remain enabled for chart interactions; forms, command URIs and local resource loading are disabled.
+
+**67 unit tests pass, zero failures.** The export tests verify that the displayed HTML exactly matches the fully written file and that a failed tab opening preserves the export. Four additional cases cover webview capabilities, refreshing the existing tab, reopening after closure and extension disposal.
+
+**Six checks pass in VS Code Insiders 1.145.0-insider**, using the development extension in an isolated local profile with monitoring disabled: activation, a complete standalone export, an active editor webview, tab reuse with a distinct export, closing/reopening the tab and the existing JSON diagnostic command. `verification/report-webview.json` records these checks, unit-test counters and the three changed runtime-file hashes. This checks the actual editor tab; it does not requalify the installed VSIX, Stable or chart rendering inside the webview.
+
+The installed-VSIX and browser evidence below describes the original 29 October build, which opened reports externally. Those archives have not been rebuilt or requalified for this source change.
+
+## Original automated checks — 29 October 2026
 
 **63 unit tests pass, zero failures.** The existing policy, ownership, controller and journal tests remain covered. Added cases exercise serialized journal reads during rotation, missing and unreadable journal paths, malformed JSON, byte caps, disk/memory deduplication, legacy Editor Services-only records, PID reuse, partial inventories, invalid measurements, text escaping, recorded events, graph discontinuities, peak-preserving display reduction, unique report files, workspace/global storage and external-open failure.
 
@@ -26,7 +60,7 @@ Final documentation-only repackaging can change the archive hash; `verification/
 
 - Export reads only this window's current three rotated journal files, **at most 15 MiB**, and merges them with the 200-entry memory history. It does not discover earlier editor log sessions.
 - Historical inventories retain at most 20 processes; separate Editor Services samples may provide additional observations. Partial history is explicit; absent measurements remain gaps and observed peaks do not establish lifetime maxima. Older records use inferred cadence for long-gap detection.
-- A report is a dated snapshot. Opening uses the operating system's `.html` association; failure retains the file and offers its location. Chromium/Edge browser behavior is qualified; other browser engines are not separately exercised.
+- A report is a dated snapshot. The current source opens it in a VS Code editor webview; failure retains the file and offers its location. The original standalone Chromium/Edge rendering checks predate the webview change; chart interactions inside the webview and other browser engines are not separately exercised.
 - Export creates no new runtime dependency, network request, memory collection, restart request or policy change. Saved reports are not automatically deleted.
 - Long-duration stability, real access-denied ACL behavior, genuinely unresponsive Editor Services, shared-profile multi-window isolation and stabilized attributable memory overhead remain unqualified. Remote/non-Windows execution remains outside the product scope.
 

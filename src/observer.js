@@ -41,6 +41,8 @@ class WindowProcessObserver {
     this.collect = options.collect || collectProcesses;
     this.resolveEditor = options.resolveEditor || resolveSession;
     this.collectorExecutable = options.collectorExecutable;
+    this.activity = options.activity;
+    this.terminals = new Map();
   }
 
   async executable(terminals) {
@@ -78,15 +80,34 @@ class WindowProcessObserver {
       editorExecutable: this.editorExecutable,
       editor: editor?.pid ? { pid: editor.pid, shellPath: editor.shellPath, logPath: editor.logPath, sessionPath: editor.sessionPath } : null };
     const result = await this.collect(await this.executable(terminals), request, remaining, signal);
+    this.terminals.clear();
     const processes = result.processes.map((sample) => ({ ...sample,
+      cpuTimeMs: Number.isFinite(sample.cpuTimeMs) && sample.cpuTimeMs >= 0 ? sample.cpuTimeMs : null,
+      threadCount: Number.isSafeInteger(sample.threadCount) && sample.threadCount >= 0 ? sample.threadCount : null,
+      handleCount: Number.isSafeInteger(sample.handleCount) && sample.handleCount >= 0 ? sample.handleCount : null,
+      parentPid: Number.isSafeInteger(sample.parentPid) && sample.parentPid > 0 ? sample.parentPid : null,
       kind: result.editorVerified && sample.pid === editor?.pid ? 'editorServices' : active.some((entry) => entry.pid === sample.pid) ? 'terminal' : 'child',
       automaticRestart: result.editorVerified && sample.pid === editor?.pid,
     }));
+    for (const sample of processes) {
+      const root = active.find((entry) => entry.pid === sample.rootPid || entry.pid === sample.pid);
+      if (root) {
+        this.terminals.set(`${sample.pid}:${new Date(sample.createdAt).toISOString()}`, root.terminal);
+        sample.terminalName = String(root.terminal.name || 'PowerShell').slice(0, 120);
+      }
+      sample.activity = this.activity?.get(root?.terminal || (sample.automaticRestart ? editor?.terminal : null)) || { state: 'unknown', source: 'unavailable' };
+    }
     const editorSample = processes.find((sample) => sample.automaticRestart);
     return { target: editorSample ? editor : { state: 'waiting', detail: 'No verified Editor Services restart target in this window.' },
       sample: editorSample || null, inventory: { processes, errors: result.errors, limited: result.limited,
         complete: !result.limited && result.errors.length === 0 && unresolvedTerminals === 0,
         unresolvedTerminals, editorIssue, measuredAt: new Date().toISOString(), scope: 'window' } };
+  }
+
+  showTerminal(identity) {
+    const terminal = this.terminals.get(identity);
+    if (!terminal || !this.vscode.window.terminals.includes(terminal) || terminal.exitStatus) return false;
+    terminal.show(); return true;
   }
 }
 
