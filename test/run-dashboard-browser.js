@@ -38,9 +38,24 @@ async function main() {
     await post(snapshot);
     assert.equal(await evaluate('document.querySelectorAll("#inventory tr:not(:has(.group))").length'), 3);
     assert.equal(await evaluate('document.querySelectorAll("#inventory .group").length'), 2);
-    assert.equal(await evaluate('document.querySelectorAll("#chart polyline").length'), 4, 'Missing inventory creates an explicit gap in both traces.');
+    assert.equal(await evaluate('document.querySelectorAll("#chart polyline").length'), 4, 'Both memory traces retain explicit collection gaps.');
+    assert.deepEqual(await evaluate('Array.from(new Set(Array.from(document.querySelectorAll("#chart [data-profile]"),el=>el.dataset.profile))).sort()'), ['build', 'development', 'tests']);
+    assert.ok(await evaluate('document.getElementById("chart-legend").textContent.includes("tests · terminal · high 12 GiB")'));
+    await evaluate('document.getElementById("show-profiles").click()');
+    assert.equal(await evaluate('document.querySelectorAll("#chart [data-profile]").length'), 0);
+    await evaluate('document.getElementById("show-profiles").click();');
+    assert.deepEqual(await evaluate('Array.from(document.getElementById("live-interval").options,o=>Number(o.value))'), [0, 250, 500, 1000, 2000, 5000]);
+    assert.equal(await evaluate('document.querySelector("#live-controls label[for=live-interval]").textContent'), 'Refresh interval');
+    assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("off")'));
+    for (const milliseconds of [250, 500, 1000, 2000, 5000, 0]) {
+      await evaluate(`document.getElementById('live-interval').value='${milliseconds}';document.getElementById('live-interval').dispatchEvent(new Event('change'));`);
+      assert.deepEqual(await evaluate('window.sent.at(-1)'), { action: 'liveInterval', milliseconds });
+    }
+    await evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify({ type: 'snapshot', model: { ...dashboardModel(snapshot), liveIntervalMs: 500 } })}}))`);
+    assert.equal(await evaluate('document.getElementById("live-interval").value'), '500');
+    assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("500 ms")'));
     assert.equal(await evaluate('typeof window.attacked'), 'undefined'); assert.equal(await evaluate('document.querySelectorAll("img[src=x]").length'), 0);
-    checks.push('Live inventory, terminal grouping, memory traces, explicit collection gap and hostile text render correctly.');
+    checks.push('Development/tests/build thresholds share the selected process chart; profile visibility, collection gaps, hostile text and all six live delays work.');
     await evaluate('document.getElementById("sort").value="tree";document.getElementById("sort").dispatchEvent(new Event("change"));');
     assert.ok(await evaluate('document.getElementById("inventory").textContent.includes("↳ 2")'));
     await evaluate('document.getElementById("kind").value="child";document.getElementById("kind").dispatchEvent(new Event("change"));');
@@ -54,6 +69,7 @@ async function main() {
     await fs.writeFile(path.join(directory, 'desktop.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));
     await send('Emulation.setDeviceMetricsOverride', { width: 340, height: 1000, deviceScaleFactor: 1, mobile: false });
     assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
+    assert.ok(await evaluate('(()=>{const r=document.getElementById("live-interval").getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()'), 'Refresh interval is visible in the initial 340px sidebar viewport.');
     await fs.writeFile(path.join(directory, 'sidebar.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));
     await post({ ...snapshot, state: 'error', detail: 'Measurement failed.', processes: [], restartCountdown: null,
       health: { ...snapshot.health, consecutiveErrors: 2, lastError: 'collection', inventoryComplete: false, stale: true, automaticRestartBlockedBy: ['measurementStaleOrMissing'] } });

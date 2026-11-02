@@ -10,7 +10,7 @@ Windows Desktop only. Runs locally, with no runtime npm dependencies or telemetr
 
 ## Install
 
-Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.4.0.vsix`, then reload the window if upgrading.
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.0.vsix`, then reload the window if upgrading.
 
 Requires **VS Code 1.114+** (Stable or Insiders), **Windows** and **PowerShell 7 Core** for the independent collector. Monitoring ordinary processes needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
 
@@ -41,7 +41,9 @@ One GiB is 1,073,741,824 bytes.
 
 Open the **PowerShell Watchdog** activity-bar view or run **PowerShell Watchdog: Open Live Dashboard** for a larger editor tab. Both receive the same live measurements.
 
-- Private and resident memory curves with process selection, creation-time identities and explicit collection gaps.
+- At the top, **Live monitoring → Refresh interval** configures live collection: **0 (off), 250 ms, 500 ms, 1 s, 2 s or 5 s**, shared between this window's dashboard views. The current cadence appears below the selector. The delay starts after collection completes; live collection pauses while every dashboard is hidden. Off preserves the normal Watchdog schedule. The selection lasts for the current extension session.
+- Private and resident memory curves with process selection, creation-time identities and explicit collection gaps. Blue curves show private memory; purple dashed curves show resident memory.
+- **Development, Tests and Build thresholds appear together** on the diagram, using current user settings and absolute overrides for the selected process kind. The active profile is marked in the legend; dotted lines show warning thresholds and long-dashed lines show high thresholds. Toggle **Show all workload profiles** to hide these comparison lines.
 - Processes grouped by terminal/root, sorted by private memory, CPU, PID or process tree; filter by Editor Services, terminal or child.
 - Private memory, resident memory, CPU, threads, handles, growth and observed activity. **Open** focuses the process's current terminal when it is still available.
 - Workload profile, scheduled restart actions, collection health and recent persisted events.

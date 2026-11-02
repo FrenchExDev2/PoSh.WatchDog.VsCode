@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Add shared live dashboard collection delays: off, 250 ms, 500 ms, 1 s, 2 s and 5 s, pausing when all dashboards are hidden and waiting for each collection to complete.
+- Compare Development/Tests/Build thresholds simultaneously on the selected process memory chart, with a legend, profile visibility toggle and absolute per-kind overrides.
+- Place the refresh interval in a dedicated Live monitoring section at the top, show its current state, and identify the dashboard version.
+
 ## 0.4.0
 
 - Add a live activity-bar dashboard and reusable editor view with memory curves, terminal groups, process tree, filters, sorting and terminal navigation.

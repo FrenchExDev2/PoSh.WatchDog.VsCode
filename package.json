@@ -2,7 +2,7 @@
   "name": "powershell-watchdog",
   "displayName": "PowerShell Memory Watchdog",
   "description": "Monitor memory of pwsh processes owned by each local VS Code window on Windows.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "FrenchExDev",
   "repository": {
     "type": "git",

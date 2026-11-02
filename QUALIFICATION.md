@@ -1,3 +1,15 @@
+# Qualification — 0.5.0
+
+Date: **2 November 2026**. Source validation for configurable live dashboard collection and simultaneous Development/Tests/Build threshold comparisons.
+
+**101 automated tests pass on the Windows host, zero failures or skipped tests.** The four dashboard cases additionally cover all supported delays, shared views, waiting for collection completion, visibility/disposal cleanup, collection errors and absolute profile thresholds.
+
+**Four browser scenario groups pass in an owned headless Edge profile.** The existing dashboard harness verifies all six live interval choices, shared interval display, profile threshold lines and legend, visibility toggle, desktop/340px layout, existing dashboard actions, explicit gaps, hostile-text escaping and offline report thresholds. No page network request, JavaScript exception or CSP error was observed. `verification/dashboard-browser.json` identifies the generated screenshots and synthetic fixture; this run does not requalify an installed VSIX or actual Editor Services restarts.
+
+Evidence: `%TEMP%/watchdog-release-0.5.0-final` (`Unit.log`, `Unit.result.json`, `Browser.log`, `Browser.result.json`, `state.json`, `summary.txt`). Reopen the saved monitor with `pwsh -File "$env:TEMP/watchdog-release-0.5.0-final/Watch.ps1" -RunRoot "$env:TEMP/watchdog-release-0.5.0-final"`; it exits automatically for completed runs.
+
+---
+
 # Qualification — 0.4.0
 
 Date: **2 November 2026**. Source qualification for the live dashboard, restart countdown, growth alerts, process metrics, workload profiles, persistent history, health diagnostics and activity protection.
