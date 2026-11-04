@@ -8,11 +8,13 @@ try {
     if (!$IsWindows -or $PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion.Major -lt 7) { throw 'UnsupportedPlatform' }
     $request = [Console]::In.ReadToEnd() | ConvertFrom-Json -ErrorAction Stop
     $rootIds = @($request.rootProcessIds | Where-Object { $_ -is [long] -or $_ -is [int] } | ForEach-Object { [int]$_ } | Where-Object { $_ -gt 0 })
-    if (!$rootIds.Count -or $rootIds.Count -gt 256 -or !$request.editorExecutable) { throw 'InvalidRequest' }
+    if (!$rootIds.Count -or $rootIds.Count -gt 256 -or !$request.editorExecutable -or
+        ($request.hostProcessId -isnot [long] -and $request.hostProcessId -isnot [int]) -or $request.hostProcessId -le 0 -or
+        $request.hostProcessId -notin $rootIds) { throw 'InvalidRequest' }
     . (Join-Path $PSScriptRoot 'Select-WindowProcesses.ps1')
     $snapshot = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, Name, ExecutablePath)
     $errors = [Collections.Generic.List[object]]::new()
-    $selected = @(Select-WindowPowerShellProcess -Processes $snapshot -RootProcessIds $rootIds -EditorExecutable $request.editorExecutable -ExcludedProcessId $PID -OwnershipErrors $errors)
+    $selected = @(Select-WindowPowerShellProcess -Processes $snapshot -RootProcessIds $rootIds -EditorExecutable $request.editorExecutable -HostProcessId $request.hostProcessId -ExcludedProcessId $PID -OwnershipErrors $errors)
     $availableIds = [Collections.Generic.HashSet[int]]::new()
     foreach ($entry in $snapshot) { [void]$availableIds.Add([int]$entry.ProcessId) }
     foreach ($rootId in $rootIds) {

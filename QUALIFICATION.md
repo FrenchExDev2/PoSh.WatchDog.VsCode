@@ -1,4 +1,14 @@
-# Qualification — 0.5.1
+# Qualification — 0.5.2
+
+Date: **4 November 2026**. Process selection now requires the extension host's actual VS Code application ancestry in addition to this window's terminal roots. Separate instances of the same executable, nested editor instances, missing host identity, reused parent PIDs and cyclic editor ancestry are rejected. A terminal removed during collection cannot authorize an Editor Services restart. Stable and Insiders retain restart support for their own verified sessions.
+
+**116 automated tests pass on the Windows host, zero failures, cancelled or skipped tests.** The native PowerShell fixture covers 17 prepared ownership cases, including a mixed Stable/Insiders graph and distinct Insiders instances. Observer regressions cover explicit host identity, retained Stable/Insiders support and terminal removal during collection. These are source-level tests with prepared graphs and controlled VS Code dependencies; installed Desktop collection and real Editor Services restarts have not been requalified for this version.
+
+Evidence: `.sandbox/insiders-ownership-unit.log`, `.sandbox/insiders-ownership-unit.json`, `.sandbox/insiders-ownership-state.json` and `.sandbox/insiders-ownership-summary.txt` retain the final local run. The read-only visible monitor `.sandbox/Monitor-InsidersOwnership.ps1` closes automatically after the runner saves its final result. QuietCli RECORD: `f54d14321af6`. Earlier installed-VSIX and browser results below describe their recorded builds.
+
+---
+
+# Historical qualification — 0.5.1
 
 Date: **2 November 2026**. Enable and Resume now clear persisted suspension and request fresh measurement. Explicit resume acknowledges the previous post-restart improvement failure, while retaining cooldown, rolling-hour quota and pending-command protections.
 

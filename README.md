@@ -10,7 +10,7 @@ Windows Desktop only. Runs locally, with no runtime npm dependencies or telemetr
 
 ## Install
 
-Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.1.vsix`, then reload the window if upgrading.
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.2.vsix`, then reload the window if upgrading.
 
 Requires **VS Code 1.114+** (Stable or Insiders), **Windows** and **PowerShell 7 Core** for the independent collector. Monitoring ordinary processes needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
 
@@ -118,7 +118,7 @@ The health view and JSON include collection start/end, duration, next scheduled 
 
 Suspend, resume and configuration changes are recorded even without a new memory collection. Repeated paused cycles do not add duplicate state events.
 
-Only processes with a verifiable ownership chain to the current window are included. Detached processes may be excluded. Collection errors never become zero memory, and full command lines are neither returned nor logged.
+Only processes with a verifiable ownership chain to the current window and the extension host's actual VS Code application instance are included. Matching the executable path alone is insufficient: separate instances of the same executable and nested editor instances are excluded. Terminal roots must belong to that same instance. Missing host identity, cyclic ancestry or reused parent PIDs cannot authorize selection or restart. Detached processes may be excluded. Collection errors never become zero memory, and full command lines are neither returned nor logged.
 
 ## Development and details
 

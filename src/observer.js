@@ -76,18 +76,20 @@ class WindowProcessObserver {
     const active = roots.filter((entry) => entry && this.vscode.window.terminals.includes(entry.terminal) && !entry.terminal.exitStatus);
     const remaining = milliseconds - (Date.now() - start);
     if (remaining <= 0) throw new WatchdogError('timeout', 'Process collection deadline exceeded.');
-    const request = { rootProcessIds: [...new Set([this.hostPid, ...active.map((entry) => entry.pid)])],
+    const request = { hostProcessId: this.hostPid, rootProcessIds: [...new Set([this.hostPid, ...active.map((entry) => entry.pid)])],
       editorExecutable: this.editorExecutable,
       editor: editor?.pid ? { pid: editor.pid, shellPath: editor.shellPath, logPath: editor.logPath, sessionPath: editor.sessionPath } : null };
     const result = await this.collect(await this.executable(terminals), request, remaining, signal);
+    // Native ancestry verification must still refer to a live terminal of this window after collection.
+    const editorVerified = result.editorVerified && this.vscode.window.terminals.includes(editor?.terminal) && !editor.terminal.exitStatus;
     this.terminals.clear();
     const processes = result.processes.map((sample) => ({ ...sample,
       cpuTimeMs: Number.isFinite(sample.cpuTimeMs) && sample.cpuTimeMs >= 0 ? sample.cpuTimeMs : null,
       threadCount: Number.isSafeInteger(sample.threadCount) && sample.threadCount >= 0 ? sample.threadCount : null,
       handleCount: Number.isSafeInteger(sample.handleCount) && sample.handleCount >= 0 ? sample.handleCount : null,
       parentPid: Number.isSafeInteger(sample.parentPid) && sample.parentPid > 0 ? sample.parentPid : null,
-      kind: result.editorVerified && sample.pid === editor?.pid ? 'editorServices' : active.some((entry) => entry.pid === sample.pid) ? 'terminal' : 'child',
-      automaticRestart: result.editorVerified && sample.pid === editor?.pid,
+      kind: editorVerified && sample.pid === editor?.pid ? 'editorServices' : active.some((entry) => entry.pid === sample.pid) ? 'terminal' : 'child',
+      automaticRestart: editorVerified && sample.pid === editor?.pid,
     }));
     for (const sample of processes) {
       const root = active.find((entry) => entry.pid === sample.rootPid || entry.pid === sample.pid);

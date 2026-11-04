@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.2
+
+- Restrict automatic and manual Editor Services restart targets to verified pwsh descendants of the hosting VS Code instance and a still-live terminal of its window.
+- Verify the extension host's process identity and editor ancestry instead of trusting executable paths alone, excluding separate and nested editor instances even when a terminal PID is supplied as a root.
+
 ## 0.5.1
 
 - Add readable Gio graduations and horizontal grid lines to the live memory chart, with a shared scale for measurements and profile thresholds and labels that adapt to sidebar resizing.
