@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4 — 2026-11-04
+
+- Require a matching changelog update before every agent-created Git commit, using a concrete release version instead of an Unreleased heading.
+- Document the changelog and version-alignment checks in the release procedure.
+- Retain the experimental upstream VS Code hover-patch browser harness in source control. It requires external upstream source fixtures and an existing TypeScript compiler; it is separate from the standard unit suite and does not modify the installed editor.
+- Exclude `patches/**` from the VSIX package.
+
 ## 0.5.3 — 2026-11-04
 
 - Display status-bar and hover memory values in automatically selected binary units (B, KiB, MiB, GiB, TiB or PiB), instead of always using GiB. Keep at most two decimal places and omit trailing zeros: `512 KiB`, `512.54 KiB`, `96 MiB`, `1.5 GiB`.

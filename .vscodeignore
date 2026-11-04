@@ -6,6 +6,7 @@ skills/**
 .vscode-test/**
 dist/**
 verification/**
+patches/**
 package-lock.json
 AGENTS.md
 CLAUDE.md

@@ -1,3 +1,13 @@
+# Qualification — 0.5.4 — release documentation and tooling
+
+Date: **4 November 2026**. This release adds mandatory changelog-before-commit instructions in `AGENTS.md`, documents the release checks, retains the experimental upstream hover-patch browser harness, and excludes `patches/**` from VSIX packaging. Manifest and lockfile versions are aligned with tag `v0.5.4`. The extension runtime is unchanged from 0.5.3.
+
+**121 automated tests pass on the Windows host, zero failures, cancelled or skipped tests**, in approximately 11.4 seconds. Evidence: `.sandbox/release-0.5.4-unit.log` and `.sandbox/release-0.5.4-unit.json`; QuietCli RECORD: `db8a30320948`. The dedicated visible PowerShell monitor closed automatically after the run.
+
+The experimental `test/run-vscode-hover-patch.js` harness is not part of `test/*.test.js` and was not executed for this release. It requires external base/candidate upstream source fixtures and an existing TypeScript compiler. No browser-patch validation, installed VSIX qualification or Marketplace publication result is established by this unit run. Earlier native hover limitations remain applicable.
+
+---
+
 # Qualification — 0.5.3 — adaptive memory formatting
 
 Date: **4 November 2026**. Status-bar totals and hover totals, private memory and resident memory now select the largest reached binary unit from B, KiB, MiB, GiB, TiB and PiB. Values are rounded to at most two decimal places with trailing zeros removed: `512 KiB`, `512.54 KiB`, `96 MiB` and `1.5 GiB`. Each value selects its own unit. Unit selection precedes rounding; a value just below a boundary can therefore display `1024 KiB` or `1024 MiB`.

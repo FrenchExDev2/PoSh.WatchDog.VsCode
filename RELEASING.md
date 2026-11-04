@@ -43,6 +43,10 @@ the GitHub release and uploading assets.
 
 See the [official Trusted Publishing instructions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#publish-with-github-actions-and-trusted-publishing).
 
+## Changelog before committing
+
+Before every `git commit`, update `CHANGELOG.md` for all files included in that commit, as required by [AGENTS.md](AGENTS.md). Use the concrete release version rather than an Unreleased heading. Before tagging, verify that the latest changelog entry, `package.json`, both root versions in `package-lock.json` and the intended tag agree. Preserve historical entries and published tags.
+
 ## Publish a version
 
 1. Update `package.json`, the root package entries in `package-lock.json`, and
