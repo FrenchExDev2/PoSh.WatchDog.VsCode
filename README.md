@@ -2,7 +2,9 @@
   <img src="./images/icon.png" alt="PowerShell Memory Watchdog logo" width="150px" />
 </p>
 
-# PowerShell Memory Watchdog
+# FrenchExDev.PoSh.WatchDog.VsCode
+
+PowerShell Memory Watchdog for VS Code.
 
 Monitor the memory used by PowerShell processes in each VS Code window. Get alerts for terminals and nested `pwsh` processes, and optionally restart a verified PowerShell Editor Services session when its memory stays too high.
 
@@ -20,7 +22,11 @@ Automatic Editor Services restart requires **ms-vscode.powershell 2026.1.2** and
 
 The status bar shows the process count and total private committed memory:
 
-`pwsh 3 · 0.42 GiB total · Monitoring`
+`pwsh 3 · 430.08 MiB total · Monitoring`
+
+Hover details use an absolute collection timestamp and update when measurements or state change. There is no separate one-second tooltip timer, and unchanged text, tooltip and background are not reassigned. This avoids unnecessary hover replacements between samples. VS Code owns the native tooltip rendering and may replace its content on a real update; use the live dashboard for a persistent view at the configured refresh interval.
+
+Memory values automatically use binary units (B, KiB, MiB, GiB, TiB or PiB), with at most two decimal places and no trailing zeros: `512 KiB`, `512.54 KiB`, `1.5 GiB`.
 
 Hover for per-process measurements; click for actions. `≥` marks an incomplete total. Discovery, collection errors and a completed inventory with no processes have distinct status messages.
 

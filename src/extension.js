@@ -40,16 +40,20 @@ async function activate(context) {
   if (vscode.debug.activeDebugSession?.type.toLowerCase() === 'powershell') debugSessions.add(vscode.debug.activeDebugSession.id);
   let controller;
   let dashboard;
+  let statusBackground;
   const activity = new ActivityTracker(vscode.window, (terminal) => controller?.activityChanged(terminal));
   const observer = new WindowProcessObserver(vscode, { activity });
-  const update = (snapshot, updateDashboard = true) => {
+  const update = (snapshot) => {
     const display = describeStatus(snapshot);
-    status.text = display.text;
-    status.tooltip = display.tooltip;
-    status.backgroundColor = ['error', 'suspended', 'ambiguous', 'unsupported'].includes(snapshot.state) ?
-      new vscode.ThemeColor('statusBarItem.errorBackground') :
-      ['warning', 'confirmed'].includes(snapshot.state) ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
-    if (updateDashboard) dashboard?.update();
+    if (status.text !== display.text) status.text = display.text;
+    if (status.tooltip !== display.tooltip) status.tooltip = display.tooltip;
+    const background = ['error', 'suspended', 'ambiguous', 'unsupported'].includes(snapshot.state) ? 'error' :
+      ['warning', 'confirmed'].includes(snapshot.state) ? 'warning' : null;
+    if (statusBackground !== background) {
+      statusBackground = background;
+      status.backgroundColor = background ? new vscode.ThemeColor(`statusBarItem.${background}Background`) : undefined;
+    }
+    dashboard?.update();
   };
   const notice = (level, message) => {
     if (level === 'countdown') {
@@ -177,8 +181,6 @@ async function activate(context) {
     vscode.debug.onDidStartDebugSession((session) => { if (session.type.toLowerCase() === 'powershell') { debugSessions.add(session.id); controller.activityChanged(); } }),
     vscode.debug.onDidTerminateDebugSession((session) => { if (debugSessions.delete(session.id)) controller.activityChanged(); }),
   );
-  const ageTimer = setInterval(() => update(controller.snapshot(), false), 1000);
-  context.subscriptions.push({ dispose: () => clearInterval(ageTimer) });
   controller.start();
   // Read-only diagnostics and an explicit sample request are useful to integration clients.
   return { getSnapshot: () => controller.snapshot(), sampleNow: () => controller.tick() };

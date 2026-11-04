@@ -13,6 +13,14 @@ async function fixture(enabled = true, delayedConfiguration = false) {
   let configurationChanged;
   let stored;
   let collections = 0;
+  let memoryBytes = GiB;
+  let measuredAt = '2026-11-04T04:00:00Z';
+  let intervals = 0;
+  const statusWrites = { text: 0, tooltip: 0, backgroundColor: 0 };
+  const status = new Proxy({ show() {}, dispose() {} }, { set(target, key, value) {
+    if (Object.hasOwn(statusWrites, key)) statusWrites[key]++;
+    target[key] = value; return true;
+  } });
   const configuration = {
     inspect: (key) => ({ globalValue: key === 'enabled' ? enabled : defaults[key] }),
     async update(key, value) {
@@ -24,7 +32,7 @@ async function fixture(enabled = true, delayedConfiguration = false) {
   const vscode = {
     StatusBarAlignment: { Right: 1 }, ConfigurationTarget: { Global: 1 }, UIKind: { Desktop: 1 },
     env: { uiKind: 1 }, debug: { onDidStartDebugSession: disposable, onDidTerminateDebugSession: disposable },
-    window: { createStatusBarItem: () => ({ show() {}, dispose() {} }),
+    window: { createStatusBarItem: () => status,
       showErrorMessage: (message) => { throw new Error(message); } },
     workspace: { getConfiguration: () => configuration,
       onDidChangeConfiguration: (callback) => { configurationChanged = callback; return disposable(); } },
@@ -39,9 +47,9 @@ async function fixture(enabled = true, delayedConfiguration = false) {
     './observer': { WindowProcessObserver: class {
       async observe() {
         collections++;
-        return { target: { state: 'waiting' }, sample: null, inventory: { complete: true, errors: [],
-          processes: [{ pid: 42, createdAt: '2026-11-02T10:00:00Z', privateBytes: GiB,
-            workingSetBytes: GiB, measuredAt: new Date().toISOString(), kind: 'terminal' }] } };
+        return { target: { state: 'waiting' }, sample: null, inventory: { complete: true, errors: [], measuredAt,
+          processes: [{ pid: 42, createdAt: '2026-11-02T10:00:00Z', privateBytes: memoryBytes,
+            workingSetBytes: GiB, measuredAt, kind: 'terminal' }] } };
       }
     } },
     './controller': { WatchdogController: class extends WatchdogController { start() {} } },
@@ -57,12 +65,35 @@ async function fixture(enabled = true, delayedConfiguration = false) {
   const source = await fs.readFile(require.resolve('../src/extension'), 'utf8');
   const sandbox = { module: { exports: {} }, process,
     require: (name) => dependencies[name] || require(name.startsWith('./') ? `../src/${name.slice(2)}` : name),
-    setInterval: () => 1, clearInterval() {} };
+    setInterval: () => { intervals++; return 1; }, clearInterval() {} };
   vm.runInNewContext(source, sandbox, { filename: 'extension.js' });
   const api = await sandbox.module.exports.activate(context);
-  return { api, journal, commands, stored: () => stored, collections: () => collections,
+  return { api, journal, commands, statusWrites, intervals: () => intervals,
+    setMeasurement: (bytes, at) => { memoryBytes = bytes; measuredAt = at; }, stored: () => stored, collections: () => collections,
     dispose: () => context.subscriptions.forEach((item) => item.dispose()) };
 }
+
+test('unchanged observations do not reassign the native tooltip or status, and no age timer runs', async (t) => {
+  const f = await fixture();
+  t.after(f.dispose);
+  await f.commands.get('powershellWatchdog.enable')();
+  const before = { ...f.statusWrites };
+  await f.api.sampleNow(); await f.api.sampleNow();
+  assert.deepEqual(f.statusWrites, before);
+  assert.equal(f.intervals(), 0);
+});
+
+test('a changed measurement still updates the hover and status through the collection callback', async (t) => {
+  const f = await fixture();
+  t.after(f.dispose);
+  await f.commands.get('powershellWatchdog.enable')();
+  const before = { ...f.statusWrites };
+  f.setMeasurement(GiB / 2, '2026-11-04T04:00:15Z');
+  await f.api.sampleNow();
+  assert.equal(f.statusWrites.tooltip, before.tooltip + 1);
+  assert.equal(f.statusWrites.text, before.text + 1);
+  assert.equal(f.statusWrites.backgroundColor, before.backgroundColor);
+});
 
 for (const command of ['enable', 'resume']) {
   for (const enabled of [true, false]) {

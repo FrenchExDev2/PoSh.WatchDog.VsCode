@@ -1,3 +1,27 @@
+# Qualification — 0.5.3 — adaptive memory formatting
+
+Date: **4 November 2026**. Status-bar totals and hover totals, private memory and resident memory now select the largest reached binary unit from B, KiB, MiB, GiB, TiB and PiB. Values are rounded to at most two decimal places with trailing zeros removed: `512 KiB`, `512.54 KiB`, `96 MiB` and `1.5 GiB`. Each value selects its own unit. Unit selection precedes rounding; a value just below a boundary can therefore display `1024 KiB` or `1024 MiB`.
+
+**121 automated tests pass on the Windows host, zero failures, cancelled or skipped tests.** The full unit suite completed in approximately 12.3 seconds. Two added presentation regressions cover zero and byte values, binary unit boundaries through PiB, fractional values, aggregate status text, and separate private/resident values in the tooltip. Existing presentation assertions now expect decimals only when needed.
+
+Evidence: `.sandbox/memory-format-unit.log` and `.sandbox/memory-format-unit.json` retain the latest successful run. QuietCli RECORD: `4ee00a40114e`. Tests ran in the background with a dedicated visible PowerShell monitor that closed automatically on completion.
+
+This validates source formatting and controlled presentation output. It does not requalify the installed VSIX, Desktop hover behavior, dashboard/report chart formatting or real Editor Services restarts. The recorded validation run did not install or publish a package. The native hover acceptance criterion below remains open.
+
+---
+
+# Source validation — native hover
+
+Date: **4 November 2026**. The local project directory is now `FrenchExDev.PoSh.WatchDog.VsCode`. The current source removes the one-second tooltip age timer, displays an absolute collection timestamp and avoids assigning unchanged status text, tooltip and background. New measurements and errors still update the native tooltip.
+
+**119 automated tests pass from the renamed directory, zero failures.** Three regressions verify stable tooltip content as time passes, no repeated API assignments for unchanged observations, and delivery of changed measurements. These controlled API tests do not establish continuous visibility or flicker-free updates in the native desktop hover.
+
+The requested behavior remains an open acceptance criterion: while the pointer remains over the status item or hover, the same visible hover instance must survive repeated real measurement updates, display the new content, preserve focus and scrolling, resize as needed, and close only when the hover interaction ends. Reducing refresh frequency alone does not satisfy this criterion. Installed Insiders **1.146.0-insider** still disposes and recreates its managed hover on content changes, matching [`ManagedHoverWidget.show`](https://github.com/microsoft/vscode/blob/main/src/vs/platform/hover/browser/updatableHoverWidget.ts#L79). No installed VS Code files were modified and no new release was published for these source changes.
+
+Evidence: `.sandbox/status-stability-unit.log`, `.sandbox/status-stability-unit.json`, `.sandbox/status-stability-state.json` and `.sandbox/status-stability-summary.txt`. Reopen `.sandbox/Monitor-StatusStability.ps1` for the saved result; it closes automatically for a completed run. QuietCli RECORD: `43e183d46326`.
+
+---
+
 # Qualification — 0.5.2
 
 Date: **4 November 2026**. Process selection now requires the extension host's actual VS Code application ancestry in addition to this window's terminal roots. Separate instances of the same executable, nested editor instances, missing host identity, reused parent PIDs and cyclic editor ancestry are rejected. A terminal removed during collection cannot authorize an Editor Services restart. Stable and Insiders retain restart support for their own verified sessions.

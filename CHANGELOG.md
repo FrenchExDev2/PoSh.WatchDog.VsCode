@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 — 2026-11-04
+
+- Display status-bar and hover memory values in automatically selected binary units (B, KiB, MiB, GiB, TiB or PiB), instead of always using GiB. Keep at most two decimal places and omit trailing zeros: `512 KiB`, `512.54 KiB`, `96 MiB`, `1.5 GiB`.
+- Add regression coverage for binary unit boundaries, fractional values, and independently formatted aggregate, private and resident memory. The current Windows source suite passes all 121 tests.
+- Rename the local project to FrenchExDev.PoSh.WatchDog.VsCode.
+- Reduce native hover replacements by removing the one-second age timer, displaying an absolute collection timestamp and skipping unchanged tooltip, text and background assignments. Measurement updates and collection errors still propagate immediately.
+
 ## 0.5.2
 
 - Restrict automatic and manual Editor Services restart targets to verified pwsh descendants of the hosting VS Code instance and a still-live terminal of its window.
