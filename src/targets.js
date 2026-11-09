@@ -24,6 +24,8 @@ const BUILTIN_PROFILES = Object.freeze(Object.fromEntries(Object.entries({
   minimal: ['pwsh-editor-services'],
   dotnet: ['csharp', 'pwsh-editor-services', 'pwsh-terminals'],
   web: ['tsserver', 'tsgo', 'eslint', 'node-tools', 'all-terminals'],
+  python: ['python', 'python-tools', 'all-terminals'],
+  rust: ['rust-analyzer', 'rust-builds', 'all-terminals'],
 }).map(([name, list]) => [name, Object.freeze(list)])));
 const DEFAULT_PROFILE = 'default';
 const APPROVALS_KEY = 'memoryWatchdog.approvals';

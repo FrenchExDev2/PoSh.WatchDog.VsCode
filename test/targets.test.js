@@ -17,6 +17,8 @@ const VERIFIED_AUTOMATIC = {
   'pwsh-editor-services': 'PowerShell.RestartSession', // ms-vscode.PowerShell (0.5.x qualification)
   'eslint': 'eslint.restart',
   'tsgo': 'typescript.native-preview.restart',
+  'python': 'python.analysis.restartLanguageServer',
+  'rust-analyzer': 'rust-analyzer.restartServer',
   // verified-automatic-end
 };
 
@@ -88,7 +90,7 @@ test('the JSON schema and the runtime validator accept the same properties', asy
 test('every built-in config is valid, cross-platform and matches its intended processes', async () => {
   const { configs, issues } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
   assert.deepEqual(issues, []);
-  assert.deepEqual([...configs.keys()].sort(), ['all-terminals', 'csharp', 'eslint', 'node-tools', 'pwsh-children', 'pwsh-editor-services', 'pwsh-terminals', 'tsgo', 'tsserver']);
+  assert.deepEqual([...configs.keys()].sort(), ['all-terminals', 'csharp', 'eslint', 'node-tools', 'pwsh-children', 'pwsh-editor-services', 'pwsh-terminals', 'python', 'python-tools', 'rust-analyzer', 'rust-builds', 'tsgo', 'tsserver']);
   for (const entry of configs.values()) {
     assert.equal(entry.builtin, true);
     for (const name of entry.config.match?.processNames || []) assert.ok(!/\.exe$/i.test(name), `${entry.name} names must not be Windows-only`);
@@ -257,4 +259,34 @@ test('dotnet profile assigns Roslyn and pwsh terminals on Windows and Linux', as
     [31, 2, 'pwsh.exe'], [32, 2, 'bash.exe']], [31, 32]), { 30: 'csharp', 31: 'pwsh-terminals', 32: null });
   assert.deepEqual(await matchBuiltin('dotnet', 'linux', [[30, 2, 'dotnet', '/usr/bin/dotnet /home/u/.roslyn/Microsoft.CodeAnalysis.LanguageServer.dll'], [31, 2, 'pwsh']], [31]),
     { 30: 'csharp', 31: 'pwsh-terminals' });
+});
+
+test('wave 3 configs: Pylance server and Python interpreters on every OS', async () => {
+  const { configs } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
+  assert.deepEqual(testPattern(configs.get('python').config.match.commandLine, [
+    'C:\\Code.exe c:\\Users\\u\\.vscode\\extensions\\ms-python.vscode-pylance-2026.4.1\\dist\\server.bundle.js --cancellationReceive=file:x',
+    '/usr/share/code/code /home/u/.vscode/extensions/ms-python.vscode-pylance-2026.4.1/dist/server.bundle.js',
+    '/A/Code Helper (Plugin) /Users/u/.vscode/extensions/ms-python.vscode-pylance-2026.4.1/dist/server.bundle.js',
+    'C:\\Code.exe c:\\ext\\ms-python.vscode-pylance-2026.4.1\\dist\\typeServer.bundle.js']).matches, [true, true, true, false]);
+  assert.deepEqual(testPattern(configs.get('python-tools').config.match.commandLine, [
+    '"C:\\Program Files\\Python312\\python.exe" -m pytest', 'C:\\Users\\u\\.venv\\Scripts\\pythonw.exe app.py', 'py -3.12 x.py',
+    '/usr/bin/python3.12 -m ipykernel_launcher -f k.json', 'python3', '/Library/Frameworks/Python.framework/Versions/3.12/Resources/Python.app/Contents/MacOS/Python -m pytest',
+    'pythonista run', '/usr/bin/mypy src', 'node python.js', '"C:\\Program Files\\Py Tools\\pyright.exe"']).matches,
+    [true, true, true, true, true, true, false, false, false, false]);
+});
+
+test('python and rust profiles assign servers, tools and shells on Windows, Linux and macOS', async () => {
+  const pylance = '/ext/ms-python.vscode-pylance-2026.4.1/dist/server.bundle.js';
+  const cases = {
+    win32: [[10, 2, 'Code.exe', 'C:\\Code.exe c:' + pylance.replace(/\//g, '\\')], [20, 2, 'pwsh.exe'], [21, 20, 'python.exe', 'C:\\venv\\Scripts\\python.exe -m pytest'],
+      [22, 20, 'cargo.exe', 'cargo build'], [23, 22, 'rustc.exe', 'rustc --crate-name x'], [24, 2, 'rust-analyzer.exe', 'c:\\ra\\rust-analyzer.exe']],
+    linux: [[10, 2, 'code', '/usr/share/code/code ' + pylance], [20, 2, 'bash'], [21, 20, 'python3.12', '/usr/bin/python3.12 -m pytest'],
+      [22, 20, 'cargo', 'cargo build'], [23, 22, 'rustc', 'rustc --crate-name x'], [24, 2, 'rust-analyzer', '/ra/rust-analyzer']],
+    darwin: [[10, 2, 'Code Helper (Plugin)', '/A/Code Helper (Plugin) ' + pylance], [20, 2, 'zsh'], [21, 20, 'Python', '/Library/Frameworks/Python.framework/Versions/3.12/Resources/Python.app/Contents/MacOS/Python -m pytest'],
+      [22, 20, 'cargo', 'cargo build'], [23, 22, 'rustc', 'rustc --crate-name x'], [24, 2, 'rust-analyzer', '/ra/rust-analyzer']],
+  };
+  for (const [platform, processes] of Object.entries(cases)) {
+    assert.deepEqual(await matchBuiltin('python', platform, processes, [20]), { 10: 'python', 20: 'all-terminals', 21: 'python-tools', 22: null, 23: null, 24: null }, platform);
+    assert.deepEqual(await matchBuiltin('rust', platform, processes, [20]), { 10: null, 20: 'all-terminals', 21: null, 22: 'rust-builds', 23: 'rust-builds', 24: 'rust-analyzer' }, platform);
+  }
 });

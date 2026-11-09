@@ -95,6 +95,10 @@ A config is one JSON file named `<name>.watchdog.json` describing **one target**
 | `eslint` | ESLint server (`eslintServer.js` of dbaeumer.vscode-eslint) | Automatic restart through `eslint.restart` |
 | `tsgo` | TypeScript native preview language server (`tsgo --lsp`) | Automatic restart through `typescript.native-preview.restart` |
 | `node-tools` | `node`, `bun`, `deno` started from a terminal or an extension (builds, tests, dev servers) | Alerts |
+| `python` | Pylance language server (`server.bundle.js` of ms-python.vscode-pylance) | Automatic restart through `python.analysis.restartLanguageServer` |
+| `python-tools` | `python`, `python3.x`, `pythonw`, `py` (tests, kernels, scripts) | Alerts |
+| `rust-analyzer` | `rust-analyzer` | Automatic restart through `rust-analyzer.restartServer` (manual when a rustup proxy makes two processes) |
+| `rust-builds` | `cargo`, `rustc` | Alerts |
 | `all-terminals` | Every terminal shell, whatever the shell | Alerts |
 
 Built-in automatic restart commands were checked against `contributes.commands` in the owning extension's `package.json` (version noted in each config's `description`). A built-in config with a restart command but several processes per window (`tsserver`) stays notify-only. Automatic restarts also need exactly one matching process in the window.
@@ -118,6 +122,8 @@ A profile is a list of config names. A process belongs to the **first** config o
 | `minimal` | `pwsh-editor-services` only | Editor Services |
 | `dotnet` | `csharp`, `pwsh-editor-services`, `pwsh-terminals` | Editor Services |
 | `web` | `tsserver`, `tsgo`, `eslint`, `node-tools`, `all-terminals` | ESLint server, tsgo |
+| `python` | `python`, `python-tools`, `all-terminals` | Pylance |
+| `rust` | `rust-analyzer`, `rust-builds`, `all-terminals` | rust-analyzer |
 <!-- built-in-profiles -->
 
 ```json
