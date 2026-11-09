@@ -17,6 +17,7 @@ test('vsce would package configs, schema and runtime sources only', { timeout: 1
     assert.ok(files.includes(`configs/${name}.watchdog.json`), `configs/${name}.watchdog.json missing`);
   }
   assert.ok(files.includes('schemas/watchdog-config.schema.json'));
+  for (const document of ['LICENSE', 'CREDITS.md', 'README.md', 'CHANGELOG.md']) assert.ok(files.includes(document), document);
   for (const source of ['src/extension.js', 'src/platform.js', 'src/selection.js', 'src/targets.js', 'src/migration.js', 'package.json']) assert.ok(files.includes(source), source);
   assert.ok(!files.some((file) => /^(test|scripts|\.sandbox|node_modules|verification)\//.test(file)), 'no test, script, sandbox or dependency files');
 });

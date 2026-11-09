@@ -10,6 +10,8 @@ Out of the box it behaves like 0.5.x: the built-in `default` profile watches the
 
 Runs locally, with no runtime npm dependencies or telemetry. The extension ID stays `FrenchExDev.powershell-watchdog`.
 
+Independent project, not affiliated with or endorsed by Microsoft. Released under the [MIT License](LICENSE); see [CREDITS.md](CREDITS.md) for links and trademark notices.
+
 ## Install
 
 Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.6.0.vsix`, then reload the window if upgrading. When upgrading from 0.5.x, Watchdog offers once to migrate your settings (see [Migration from 0.5.x](#migration-from-05x)).
@@ -205,6 +207,7 @@ The script locates the project independently of the current directory, uses loca
 - [Qualification](QUALIFICATION.md): tested environments, browser and integration evidence, and remaining limits.
 - [Release guide](RELEASING.md): automated Marketplace publication from a version tag.
 - [Changelog](CHANGELOG.md).
+- [License (MIT)](LICENSE) and [credits and trademark notices](CREDITS.md).
 
 The production observer uses the in-process collector `src/platform.js` (Windows CIM, Linux `/proc`, macOS `ps`) with ownership selection in `src/selection.js`; the PowerShell collector scripts of 0.5.x were removed. The controller’s legacy injected `resolve`/`collect` adapter exists only for isolated regression fixtures. The old `Measure-Session.ps1` and `src/journal.js` remain historical test/reference sources and are excluded from the VSIX. `collector.js` now provides only the shared deadline helper.
 
