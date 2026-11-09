@@ -6,6 +6,7 @@ const { randomUUID } = require('node:crypto');
 const { createChartTools } = require('./report-chart');
 const { reportClient, reportStyles } = require('./report-view');
 const { pruneReports } = require('./history');
+const { median } = createChartTools();
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER ? value : null;
 const text = (value, limit = 2000) => typeof value === 'string' ? value.slice(0, limit) : '';
@@ -83,9 +84,14 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
     }
     previousState = entry.state; previousWarnings = warnings;
   }
-  const gaps = entries.slice(1).map((entry, index) => (entry.at - entries[index].at) / 1000).filter((value) => value > 0);
-  gaps.sort((left, right) => left - right);
-  const inferredInterval = gaps.length ? gaps[Math.floor(gaps.length / 2)] : snapshot.policy?.sampleIntervalSeconds || 15;
+  // Cadence is inferred within each session: interleaved windows or restarts must not shorten or stretch it.
+  const gaps = []; const lastBySession = new Map();
+  for (const entry of entries) {
+    const key = entry.sessionId || '';
+    if (lastBySession.has(key) && entry.at > lastBySession.get(key)) gaps.push((entry.at - lastBySession.get(key)) / 1000);
+    lastBySession.set(key, entry.at);
+  }
+  const inferredInterval = median(gaps) ?? (snapshot.policy?.sampleIntervalSeconds || 15);
   const issues = (retained.issues || []).map((issue) => ({ file: text(issue.file, 80), code: text(issue.code, 80) }));
   const incompleteEntries = entries.filter((entry) => entry.complete !== true || entry.omittedProcesses > 0 ||
     (entry.processCount !== null && entry.processCount > entry.processes.length) || entry.processes.some((item) => item.privateBytes === null || item.workingSetBytes === null)).length;
@@ -95,7 +101,7 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
     current: { state: text(snapshot.state, 80), detail: text(snapshot.detail), mode: text(snapshot.mode, 80),
       available: !!snapshot.inventory, complete: snapshot.inventory?.complete === true && currentProcesses.length === (snapshot.processes || []).length,
       processes: currentProcesses, sampleAgeSeconds: finite(snapshot.processSampleAgeSeconds),
-      automaticRestarts: finite(snapshot.automaticRestarts), restartOutcome: text(snapshot.restartOutcome, 80) || null },
+      automaticRestarts: finite(snapshot.automaticRestartsLastHour ?? snapshot.automaticRestarts), restartOutcome: text(snapshot.restartOutcome, 80) || null },
     entries, series: [...series.values()].sort((left, right) => (right.peakPrivateBytes ?? -1) - (left.peakPrivateBytes ?? -1)), events,
     quality: { filesRead: retained.filesRead || 0, bytesRead: retained.bytesRead || 0, invalidLines: retained.invalidLines || 0,
       invalidEntries, duplicates, issues, incompleteEntries, inferredInterval,

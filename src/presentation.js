@@ -9,6 +9,8 @@ function formatMemory(bytes) {
     value /= 1024;
     unit++;
   }
+  // Rounding may reach the next unit (1 GiB - 1 byte would read 1024 MiB).
+  if (Number(value.toFixed(unit === 0 ? 0 : 2)) >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
   return `${Number(value.toFixed(unit === 0 ? 0 : 2))} ${units[unit]}`;
 }
 const stateLabels = { normal: 'Monitoring', warning: 'Memory warning', confirmed: 'High memory', deferred: 'Restart deferred',

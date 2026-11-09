@@ -180,6 +180,21 @@ async function main() {
     assert.ok(await evaluate('document.getElementById("quality").textContent.includes("workspace across sessions")'));
     assert.deepEqual(errors, []); assert.deepEqual(requests, []);
     checks.push('Offline report uses the selected process absolute thresholds and explains workspace history scope.');
+    // 23:58 → 00:02 in Paris (22:58Z → 23:02Z in winter): time-of-day labels alone would be ambiguous, so they carry the date.
+    await send('Emulation.setTimezoneOverride', { timezoneId: 'Europe/Paris' });
+    const midnight = Date.parse('2026-11-09T22:58:00Z');
+    const crossing = Array.from({ length: 17 }, (_, i) => ({ at: new Date(midnight + i * 15000).toISOString(), state: 'normal', decision: 'ok', sampleIntervalSeconds: 15,
+      processes: [{ ...processes[0], privateBytes: GiB }] }));
+    const midnightReport = path.join(directory, 'report-midnight.html');
+    await fs.writeFile(midnightReport, renderReportHtml(buildReportModel({ snapshot: { ...snapshot, processes: [], history: crossing } })), 'utf8');
+    await send('Page.navigate', { url: pathToFileURL(midnightReport).href });
+    await until(() => evaluate('document.documentElement.dataset.reportReady==="true"'), 'midnight report');
+    assert.ok(await evaluate('document.getElementById("subtitle").textContent.startsWith("Times in Europe/Paris · ")'));
+    assert.ok(await evaluate(`(()=>{const labels=[...document.querySelectorAll('#memory-chart text[y="365"]')].map(el=>el.textContent);
+      const withDate=new Date(${midnight}).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      return labels.length===5 && labels[0]===withDate && labels[0]!==new Date(${midnight}).toLocaleTimeString();})()`), 'Labels crossing local midnight include the date.');
+    assert.deepEqual(errors, []); assert.deepEqual(requests, []);
+    checks.push('Offline report names its time zone and dates time labels when the range crosses local midnight (Europe/Paris).');
   });
   const result = { success: true, directory, checks, screenshots: ['desktop.png', 'sidebar.png', 'multi-desktop.png', 'multi-sidebar.png'] };
   await fs.mkdir(path.join(root, 'verification'), { recursive: true });

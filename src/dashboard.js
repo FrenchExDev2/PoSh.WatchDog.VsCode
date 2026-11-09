@@ -88,7 +88,9 @@ function dashboardClient(tools) {
     option.replaceChildren(...[...known.values()].map((p) => { const o = text('option', `PID ${p.pid} · ${p.targetLabel || p.targetId || p.kind} · ${p.createdAt}`); o.value = p.id; return o; }));
     option.value = selection;
     const observations = new Map();
+    const sessions = tools.sessionsOf(model.history.map((entry) => ({ ...entry, sample: null })), selection);
     for (const entry of model.history) {
+      if (!tools.relevant(entry, sessions)) continue;
       const p = entry.processes.find((item) => item.id === selection);
       const at = Date.parse(entry.at);
       observations.set(at, p ? { ...p, at } : { at, privateBytes: null, workingSetBytes: null });

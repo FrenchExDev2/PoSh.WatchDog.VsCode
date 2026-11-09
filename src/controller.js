@@ -30,7 +30,7 @@ class TargetSlot {
       mode: this.engine.policy.mode, sample: this.sample, lastValid: this.lastValid, consecutiveSamples: this.engine.count,
       thresholds: this.engine.policy.warningPrivateGiB === undefined ? null : { warningPrivateGiB: processPolicy(this.engine.policy, this.sample?.kind).warningPrivateGiB,
         restartPrivateGiB: processPolicy(this.engine.policy, this.sample?.kind).restartPrivateGiB },
-      restartOutcome: this.restartOutcome, automaticRestarts: this.engine.restarts.length, cooldownUntil: this.engine.cooldownUntil,
+      restartOutcome: this.restartOutcome, automaticRestarts: this.engine.restarts.filter((at) => at > now - 3600_000).length, cooldownUntil: this.engine.cooldownUntil,
       suspendedReason: this.engine.suspendedReason, postponeUntil: this.postponeUntil, pendingCommand: this.pendingCommand,
       restartCountdown: this.restartIntent ? { identity: this.restartIntent.identity, deadline: this.restartIntent.deadline,
         remainingSeconds: Math.max(0, Math.ceil((this.restartIntent.deadline - now) / 1000)) } : null };
@@ -82,7 +82,8 @@ class WatchdogController {
       sampleAgeSeconds: this.lastValid ? Math.max(0, (now - Date.parse(this.lastValid.measuredAt)) / 1000) : null,
       processSampleAgeSeconds: this.lastInventory?.measuredAt ? Math.max(0, (now - Date.parse(this.lastInventory.measuredAt)) / 1000) : null,
       consecutiveSamples: this.engine.count, policy: { ...this.engine.policy },
-      restartOutcome: this.restartOutcome, automaticRestarts: this.engine.restarts.length,
+      restartOutcome: this.restartOutcome, automaticRestarts: this.engine.restarts.filter((at) => at > now - 3600_000).length,
+      automaticRestartsLastHour: [...this.slots.values()].reduce((sum, slot) => sum + slot.engine.restarts.filter((at) => at > now - 3600_000).length, 0),
       cooldownUntil: this.engine.cooldownUntil, suspendUntil: this.engine.suspendUntil,
       pendingCommand: [...this.slots.values()].some((slot) => slot.pendingCommand), journalError: this.dependencies.journal.error,
       history: this.dependencies.journal.history.filter((entry) => Date.parse(entry.at) >= now - this.engine.policy.historyRetentionDays * 86400_000),

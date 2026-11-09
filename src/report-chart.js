@@ -2,13 +2,23 @@
 
 // These pure functions run identically in unit tests and in the offline report.
 function createChartTools() {
+  const find = (entry, identity) => entry.processes.find((item) => item.id === identity) || (entry.sample?.id === identity ? entry.sample : null);
+  /** Sessions whose entries contain the process; entries of other sessions (other windows) say nothing about it. */
+  function sessionsOf(entries, identity) {
+    const sessions = new Set();
+    for (const entry of entries) if (entry.sessionId && find(entry, identity)) sessions.add(entry.sessionId);
+    return sessions;
+  }
+  const relevant = (entry, sessions) => !entry.sessionId || !sessions.size || sessions.has(entry.sessionId);
+
   function segments(entries, identity, field, fallbackInterval) {
     const result = [];
     let segment = [];
     let previous = null;
+    const sessions = sessionsOf(entries, identity);
     for (const entry of entries) {
-      const process = entry.processes.find((item) => item.id === identity) ||
-        (entry.sample?.id === identity ? entry.sample : null);
+      if (!relevant(entry, sessions)) continue;
+      const process = find(entry, identity);
       const interval = entry.sampleIntervalSeconds || fallbackInterval;
       const value = process?.[field];
       if (!Number.isFinite(value) || (previous !== null && entry.at - previous > interval * 2500)) {
@@ -67,10 +77,19 @@ function createChartTools() {
   /** Human memory value: MiB below 1 GiB, GiB with two decimals above. */
   function formatBytes(bytes, unknown = '—') {
     if (!Number.isFinite(bytes)) return unknown;
-    return Math.abs(bytes) >= GiB ? `${(bytes / GiB).toFixed(2)} GiB` : `${(bytes / MiB).toFixed(0)} MiB`;
+    // Choose the unit after rounding: 1023.6 MiB reads 1.00 GiB, never 1024 MiB.
+    return Math.round(Math.abs(bytes) / MiB) >= 1024 ? `${(bytes / GiB).toFixed(2)} GiB` : `${(bytes / MiB).toFixed(0)} MiB`;
   }
 
-  return { segments, thinSegment, memoryScale, scaleTop, formatBytes };
+  /** Median of finite values (mean of the two middle values for an even count); null when empty. */
+  function median(values) {
+    const sorted = values.filter(Number.isFinite).sort((left, right) => left - right);
+    if (!sorted.length) return null;
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  return { segments, thinSegment, memoryScale, scaleTop, formatBytes, median, sessionsOf, relevant };
 }
 
 module.exports = { createChartTools };

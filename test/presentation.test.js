@@ -11,8 +11,9 @@ test('memory formatting selects binary units at their exact boundaries', () => {
     [0, '0 B'], [1, '1 B'], [1023, '1023 B'],
     [1024, '1 KiB'], [1536, '1.5 KiB'],
     [512 * 1024, '512 KiB'], [524841, '512.54 KiB'],
-    [1024 ** 2 - 1, '1024 KiB'], [1024 ** 2, '1 MiB'],
-    [96 * 1024 ** 2, '96 MiB'], [GiB - 1, '1024 MiB'],
+    // 1023.999 KiB rounds to 1024.00 KiB = 1 MiB: the unit follows the rounded value (the old expectations '1024 KiB'/'1024 MiB' were wrong).
+    [1024 ** 2 - 1, '1 MiB'], [1024 ** 2, '1 MiB'], [1023.99 * 1024, '1023.99 KiB'],
+    [96 * 1024 ** 2, '96 MiB'], [GiB - 1, '1 GiB'],
     [GiB, '1 GiB'], [1.5 * GiB, '1.5 GiB'],
     [1024 ** 4, '1 TiB'], [1024 ** 5, '1 PiB'],
   ]) assert.equal(formatMemory(bytes), expected);

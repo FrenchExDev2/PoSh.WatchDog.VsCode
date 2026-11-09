@@ -23,7 +23,8 @@ function reportClient(tools) {
   const states = { normal: 'Monitoring', waiting: 'Waiting', warning: 'Memory warning', confirmed: 'Threshold confirmed',
     disabled: 'Monitoring disabled', suspended: 'Suspended', error: 'Measurement unavailable',
     cooldown: 'Stabilizing', deferred: 'Restart deferred', restarting: 'Restarting', unsupported: 'Unsupported', ambiguous: 'Ambiguous association' };
-  byId('subtitle').textContent = `Exported ${date(report.generatedAt)} · ${report.entries.length.toLocaleString()} retained collections · ${report.entries.length ? date(report.entries[0].at) + ' — ' + date(report.entries.at(-1).at) : 'No historical measurements'}`;
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
+  byId('subtitle').textContent = `Times in ${zone} · Exported ${date(report.generatedAt)} · ${report.entries.length.toLocaleString()} retained collections · ${report.entries.length ? date(report.entries[0].at) + ' — ' + date(report.entries.at(-1).at) : 'No historical measurements'}`;
   const privateKnown = current.processes.every((item) => item.privateBytes !== null);
   const total = current.processes.reduce((sum, item) => sum + (item.privateBytes || 0), 0);
   const exact = current.complete && privateKnown;
@@ -31,7 +32,7 @@ function reportClient(tools) {
     ['WATCHDOG STATE', states[current.state] || current.state || 'Unknown', current.detail],
     ['MEASURED PROCESSES', current.available ? `${current.complete ? '' : '≥ '}${current.processes.length}` : 'Unknown', 'Owned by this VS Code window'],
     ['PRIVATE MEMORY', current.available ? `${exact ? '' : '≥ '}${number(total)}` : 'Unknown', exact ? 'Sum of the complete current inventory' : 'Observed lower bound · inventory incomplete'],
-    ['LATEST COLLECTION', current.sampleAgeSeconds === null ? 'Unknown' : `${Math.round(current.sampleAgeSeconds)} s ago`, `${current.automaticRestarts ?? 'Unknown'} automatic editor restart requests in the rolling hour`],
+    ['LATEST COLLECTION', current.sampleAgeSeconds === null ? 'Unknown' : `${Math.round(current.sampleAgeSeconds)} s ago`, `${current.automaticRestarts ?? 'Unknown'} automatic restart request(s) in the last hour, all targets`],
   ];
   for (const [label, value, detail] of cards) {
     const card = element('article', undefined, 'card');
@@ -94,7 +95,7 @@ function reportClient(tools) {
     let offScale = false;
     for (let index = 0; index <= 4; index++) {
       const at = first + (last - first) * index / 4;
-      const label = last - first > 86400000 ? new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(at).toLocaleTimeString();
+      const label = last - first > 86400000 || new Date(first).toDateString() !== new Date(last).toDateString() ? new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(at).toLocaleTimeString();
       svg.append(svgElement('text', { x: x(at), y: 365, 'text-anchor': index === 0 ? 'start' : index === 4 ? 'end' : 'middle', class: 'axis' }, label));
     }
     if (showThresholds) {
