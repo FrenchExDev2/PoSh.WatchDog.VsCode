@@ -27,7 +27,7 @@ test('visual diagnostics opens the offline interactive report in an editor webvi
   const html = renderReportHtml(buildReportModel({ snapshot: { history: [], processes: [] } }));
   assert.equal(view.open(html), true);
   assert.equal(panels.length, 1);
-  assert.equal(panels[0].viewType, 'powershellWatchdog.visualDiagnostics');
+  assert.equal(panels[0].viewType, 'memoryWatchdog.visualDiagnostics');
   assert.equal(panels[0].column, -1);
   assert.equal(panels[0].webview.html, html);
   assert.equal(panels[0].options.enableScripts, true);

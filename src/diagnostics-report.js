@@ -19,7 +19,8 @@ function normalizeProcess(value) {
     measuredAt: time(value.measuredAt), automaticRestart: value.automaticRestart === true,
     state: text(value.state, 80), parentPid: finite(value.parentPid), rootPid: finite(value.rootPid),
     cpuPercent: finite(value.cpuPercent), threadCount: finite(value.threadCount), handleCount: finite(value.handleCount),
-    thresholds: { warningPrivateGiB: finite(value.thresholds?.warningPrivateGiB), restartPrivateGiB: finite(value.thresholds?.restartPrivateGiB) } };
+    thresholds: { warningPrivateGiB: finite(value.thresholds?.warningPrivateGiB), restartPrivateGiB: finite(value.thresholds?.restartPrivateGiB) },
+    ...(typeof value.targetId === 'string' && value.targetId ? { targetId: text(value.targetId, 64) } : {}) };
 }
 
 function normalizeEntry(value) {
@@ -115,7 +116,7 @@ function renderReportHtml(model) {
 <div class="columns"><section class="panel"><h2>Largest observed peaks</h2><p>Private committed memory · per process identity</p><div id="ranking"></div></section>
 <section class="panel"><h2>Recorded events</h2><p>State changes, memory warnings and restart outcomes.</p><div id="events"></div><div class="pager"><button id="events-prev" type="button">Previous</button><span id="events-page"></span><button id="events-next" type="button">Next</button></div></section></div>
 <section class="panel"><h2>Current process inventory</h2><p id="inventory-note"></p><div class="table-wrap"><table><thead><tr><th>PID / created</th><th>Kind</th><th>Private</th><th>Resident</th><th>Automatic restart</th></tr></thead><tbody id="inventory"></tbody></table></div></section>
-<section class="panel"><h2>Environment & interpretation</h2><dl id="environment"></dl><ul><li>Current inventory: this VS Code window, its terminals and owned pwsh children. Persistent history can include earlier sessions of the same workspace.</li><li>Thresholds apply to each process. Private and resident memory are never added together.</li><li>Ordinary terminals and child processes use alerts only. Automatic restart is restricted to verified Editor Services.</li><li>Historical inventories retain at most the 20 largest processes per collection; the separate Editor Services sample can provide additional evidence.</li><li>Missing measurements are gaps, not zero. Peaks describe retained observations, not an exhaustive lifetime maximum.</li><li>This is a point-in-time export. Run the command again for an updated report.</li></ul></section>
+<section class="panel"><h2>Environment & interpretation</h2><dl id="environment"></dl><ul><li>Current inventory: the processes of this VS Code window (extension host, terminals and their children) selected by the active profile. Persistent history can include earlier sessions of the same workspace.</li><li>Thresholds apply to each process. Private and resident memory are never added together.</li><li>Ordinary terminals and child processes use alerts only. Automatic restart is restricted to verified Editor Services.</li><li>Historical inventories retain at most the 20 largest processes per collection; the separate Editor Services sample can provide additional evidence.</li><li>Missing measurements are gaps, not zero. Peaks describe retained observations, not an exhaustive lifetime maximum.</li><li>This is a point-in-time export. Run the command again for an updated report.</li></ul></section>
 <footer>Generated locally · No network requests · 1 GiB = 1,073,741,824 bytes</footer></main>
 <script id="report-data" type="application/json">${data}</script><script nonce="${nonce}">(${reportClient.toString()})((${createChartTools.toString()})());</script></body></html>`;
 }

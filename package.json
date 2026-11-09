@@ -1,8 +1,8 @@
 {
   "name": "powershell-watchdog",
   "displayName": "FrenchExDev Memory Watchdog",
-  "description": "Per-window memory watchdog for VS Code on Windows: monitors terminal and child processes, alerts on high memory and can restart a verified editor session that stays too high. Works with the PowerShell extension (ms-vscode.powershell) and pwsh terminals.",
-  "version": "0.5.6",
+  "description": "Per-window memory watchdog for VS Code on Windows, Linux and macOS: monitors the processes of this window (terminals, language servers, tools) through config files and profiles, alerts on high memory, and restarts a target only through its own command.",
+  "version": "0.6.0",
   "publisher": "FrenchExDev",
   "repository": {
     "type": "git",
@@ -22,7 +22,11 @@
     "watchdog",
     "process",
     "language server",
-    "PowerShell"
+    "PowerShell",
+    "linux",
+    "macos",
+    "windows",
+    "tsserver"
   ],
   "main": "./src/extension.js",
   "extensionKind": [
@@ -30,11 +34,12 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onView:powershellWatchdog.dashboardView"
+    "onView:memoryWatchdog.dashboardView"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "In Restricted Mode, configs located inside a workspace folder are loaded as notify-only: they never run a restart command automatically."
     },
     "virtualWorkspaces": {
       "supported": false
@@ -52,70 +57,195 @@
   "contributes": {
     "commands": [
       {
-        "command": "powershellWatchdog.enable",
+        "command": "memoryWatchdog.enable",
         "title": "Memory Watchdog: Enable"
       },
       {
-        "command": "powershellWatchdog.disable",
+        "command": "memoryWatchdog.disable",
         "title": "Memory Watchdog: Disable"
       },
       {
-        "command": "powershellWatchdog.suspend",
+        "command": "memoryWatchdog.suspend",
         "title": "Memory Watchdog: Suspend…"
       },
       {
-        "command": "powershellWatchdog.resume",
+        "command": "memoryWatchdog.resume",
         "title": "Memory Watchdog: Resume"
       },
       {
-        "command": "powershellWatchdog.changeMode",
+        "command": "memoryWatchdog.changeMode",
         "title": "Memory Watchdog: Change Mode…"
       },
       {
-        "command": "powershellWatchdog.restart",
+        "command": "memoryWatchdog.restart",
         "title": "Memory Watchdog: Restart Editor Services Session…"
       },
       {
-        "command": "powershellWatchdog.diagnostics",
+        "command": "memoryWatchdog.diagnostics",
         "title": "Memory Watchdog: Show Diagnostics"
       },
       {
-        "command": "powershellWatchdog.visualDiagnostics",
+        "command": "memoryWatchdog.visualDiagnostics",
         "title": "Memory Watchdog: Open Visual Diagnostics (HTML)"
       },
       {
-        "command": "powershellWatchdog.menu",
+        "command": "memoryWatchdog.menu",
         "title": "Memory Watchdog: Show Actions"
       },
       {
-        "command": "powershellWatchdog.dashboard",
+        "command": "memoryWatchdog.dashboard",
         "title": "Memory Watchdog: Open Live Dashboard"
       },
       {
-        "command": "powershellWatchdog.cancelRestart",
+        "command": "memoryWatchdog.cancelRestart",
         "title": "Memory Watchdog: Cancel Scheduled Restart"
       },
       {
-        "command": "powershellWatchdog.postponeRestart",
+        "command": "memoryWatchdog.postponeRestart",
         "title": "Memory Watchdog: Postpone Restarts 5 Minutes"
       },
       {
-        "command": "powershellWatchdog.restartNow",
-        "title": "Memory Watchdog: Restart Scheduled Session Now"
+        "command": "memoryWatchdog.restartNow",
+        "title": "Memory Watchdog: Restart Scheduled Target Now"
       },
       {
-        "command": "powershellWatchdog.selectProfile",
-        "title": "Memory Watchdog: Select Workload Profile…"
+        "command": "memoryWatchdog.selectWorkload",
+        "title": "Memory Watchdog: Select Workload…"
+      },
+      {
+        "command": "memoryWatchdog.selectProfile",
+        "title": "Memory Watchdog: Select Active Profile…"
+      },
+      {
+        "command": "memoryWatchdog.approveConfig",
+        "title": "Memory Watchdog: Approve a Config Restart Command…"
+      },
+      {
+        "command": "memoryWatchdog.copyBuiltinConfig",
+        "title": "Memory Watchdog: Copy a Built-in Config to My Folder…"
+      },
+      {
+        "command": "memoryWatchdog.openConfigFolder",
+        "title": "Memory Watchdog: Open Configs Folder"
+      },
+      {
+        "command": "memoryWatchdog.reloadConfigs",
+        "title": "Memory Watchdog: Reload Configs"
+      },
+      {
+        "command": "memoryWatchdog.migrateSettings",
+        "title": "Memory Watchdog: Migrate 0.5.x Settings to Config Files"
       }
     ],
     "configuration": {
       "title": "Memory Watchdog",
       "properties": {
+        "frenchexdev.memoryWatchdog.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Monitor the processes of this VS Code window selected by the active profile.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.mode": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "notifyOnly"
+          ],
+          "default": "automatic",
+          "markdownDescription": "Global kill switch. `notifyOnly` disables every automatic restart, whatever the configs say. `automatic` lets a config restart its target when its own rules, approval and workspace trust allow it.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.sampleIntervalSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 15,
+          "description": "Delay between completed collections, in seconds.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.collectTimeoutSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 3,
+          "description": "Maximum time for one process collection, in seconds.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.historyRetentionDays": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 14,
+          "description": "Retain workspace history across VS Code sessions for this many days.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.historyMaxMiB": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 15,
+          "description": "Combined on-disk history budget in MiB.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.reportRetentionDays": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 14,
+          "description": "Age limit for owned exported HTML reports.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.reportMaxMiB": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 20,
+          "description": "Combined HTML report storage budget in MiB.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.workload": {
+          "type": "string",
+          "enum": [
+            "development",
+            "tests",
+            "build"
+          ],
+          "default": "development",
+          "markdownDescription": "Threshold multiplier for configs with `scaleWithWorkload` (default): development ×1, tests ×1.5, build ×2.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.configPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra folders containing `*.watchdog.json` configs, loaded after the built-ins and `~/.frenchexdev/memory-watchdog/`, in order; on a name collision the last one wins. Absolute paths only; `~`, `${userHome}` and `${env:NAME}` are expanded. `${workspaceFolder}` and relative paths are rejected.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.profiles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "default": {},
+          "markdownDescription": "Named profiles: each is a list of config names. The built-in `default` profile is `[\"pwsh-editor-services\", \"pwsh-terminals\", \"pwsh-children\"]`; defining `default` here replaces it.",
+          "scope": "machine"
+        },
+        "frenchexdev.memoryWatchdog.activeProfile": {
+          "type": "string",
+          "default": "default",
+          "markdownDescription": "Profile monitored in every window. An unknown name falls back to `default` with automatic restarts disabled.",
+          "scope": "machine"
+        },
         "frenchexdev.powershellWatchdog.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Monitor pwsh instances launched by this VS Code window, its terminals and their child processes.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.enabled#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.mode": {
           "type": "string",
@@ -125,69 +255,79 @@
           ],
           "default": "automatic",
           "description": "Editor Services may restart automatically; ordinary terminal and child pwsh instances generate alerts only. An editor restart can interrupt running commands.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.mode#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.sampleIntervalSeconds": {
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 15,
           "description": "Delay between completed collections, in seconds.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.sampleIntervalSeconds#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.warningPrivateGiB": {
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 4,
           "description": "Private committed memory warning threshold, in GiB.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.restartPrivateGiB": {
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 8,
           "description": "Private committed memory restart threshold, in GiB.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.consecutiveSamples": {
           "type": "integer",
           "minimum": 1,
           "default": 3,
           "description": "Consecutive valid samples at or above the restart threshold.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.collectTimeoutSeconds": {
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 3,
           "description": "Maximum time for session resolution and collection.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.collectTimeoutSeconds#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.restartTimeoutSeconds": {
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 45,
           "description": "Deadline for a measured replacement session, including command execution.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.cooldownSeconds": {
           "type": "number",
           "exclusiveMinimum": 0,
           "default": 120,
           "description": "Stabilization delay following a measured replacement session.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.maxAutomaticRestartsPerHour": {
           "type": "integer",
           "minimum": 1,
           "default": 3,
           "description": "Maximum automatic restart requests in a rolling hour, retained across reloads.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.deferWhileDebugging": {
           "type": "boolean",
           "default": true,
           "description": "Defer automatic restart while any PowerShell debug session is active.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.reportRetentionDays": {
           "default": 14,
@@ -195,7 +335,8 @@
           "scope": "machine",
           "type": "number",
           "minimum": 1,
-          "maximum": 365
+          "maximum": 365,
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.reportRetentionDays#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.historyRetentionDays": {
           "default": 14,
@@ -203,7 +344,8 @@
           "scope": "machine",
           "type": "number",
           "minimum": 1,
-          "maximum": 365
+          "maximum": 365,
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.historyRetentionDays#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.profile": {
           "type": "string",
@@ -214,7 +356,8 @@
           ],
           "default": "development",
           "description": "Workload thresholds: development ×1, tests ×1.5, build ×2. Explicit per-process values take precedence.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.workload#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.processThresholds": {
           "properties": {
@@ -265,13 +408,15 @@
           "additionalProperties": false,
           "scope": "machine",
           "default": {},
-          "type": "object"
+          "type": "object",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.deferWhileRunningCommands": {
           "type": "boolean",
           "default": true,
           "description": "Defer automatic Editor Services restart while shell integration reports a running command. Missing signals remain unknown.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.historyMaxMiB": {
           "default": 15,
@@ -279,7 +424,8 @@
           "scope": "machine",
           "type": "number",
           "minimum": 1,
-          "maximum": 100
+          "maximum": 100,
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.historyMaxMiB#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.reportMaxMiB": {
           "default": 20,
@@ -287,7 +433,8 @@
           "scope": "machine",
           "type": "number",
           "minimum": 1,
-          "maximum": 500
+          "maximum": 500,
+          "markdownDeprecationMessage": "Deprecated in 0.6: use `#frenchexdev.memoryWatchdog.reportMaxMiB#`. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.growthWindowSeconds": {
           "default": 300,
@@ -295,13 +442,15 @@
           "scope": "machine",
           "type": "number",
           "minimum": 1,
-          "maximum": 86400
+          "maximum": 86400,
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.requireKnownIdle": {
           "type": "boolean",
           "default": false,
           "description": "Require an observed idle shell integration state before automatic restart. Editor Services often cannot provide it; in that case restart remains deferred.",
-          "scope": "machine"
+          "scope": "machine",
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.growthWarningMiB": {
           "default": 500,
@@ -309,7 +458,8 @@
           "scope": "machine",
           "type": "number",
           "minimum": 1,
-          "maximum": 1048576
+          "maximum": 1048576,
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         },
         "frenchexdev.powershellWatchdog.restartGraceSeconds": {
           "default": 30,
@@ -317,28 +467,35 @@
           "scope": "machine",
           "type": "number",
           "minimum": 0,
-          "maximum": 3600
+          "maximum": 3600,
+          "markdownDeprecationMessage": "Deprecated in 0.6: per-target values now live in `*.watchdog.json` config files. Run **Memory Watchdog: Migrate 0.5.x Settings to Config Files**."
         }
       }
     },
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "powershellWatchdog",
+          "id": "memoryWatchdog",
           "title": "Memory Watchdog",
           "icon": "images/watchdog.svg"
         }
       ]
     },
     "views": {
-      "powershellWatchdog": [
+      "memoryWatchdog": [
         {
           "type": "webview",
           "name": "Live dashboard",
-          "id": "powershellWatchdog.dashboardView"
+          "id": "memoryWatchdog.dashboardView"
         }
       ]
-    }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "*.watchdog.json",
+        "url": "./schemas/watchdog-config.schema.json"
+      }
+    ]
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -20,23 +20,40 @@ function dashboardModel(snapshot = {}) {
       growth: value.growth ? { deltaMiB: Number.isFinite(value.growth.deltaMiB) ? value.growth.deltaMiB : null,
         rateMiBPerMinute: Number.isFinite(value.growth.rateMiBPerMinute) ? value.growth.rateMiBPerMinute : null,
         observedSeconds: number(value.growth.observedSeconds), warning: value.growth.warning === true } : null,
-      thresholds: { warningPrivateGiB: number(value.thresholds?.warningPrivateGiB), restartPrivateGiB: number(value.thresholds?.restartPrivateGiB) } };
+      thresholds: { warningPrivateGiB: number(value.thresholds?.warningPrivateGiB), restartPrivateGiB: number(value.thresholds?.restartPrivateGiB) },
+      targetId: typeof value.targetId === 'string' && /^[a-z0-9][a-z0-9._-]{0,63}$/.test(value.targetId) ? value.targetId : null,
+      targetLabel: typeof value.targetLabel === 'string' ? value.targetLabel.slice(0, 80) : '' };
   };
+  const text = (value, length) => (typeof value === 'string' ? value.slice(0, length) : '');
+  const statusConfigs = Array.isArray(snapshot.configs?.configs) ? snapshot.configs.configs.slice(0, 200) : null;
   const policy = { ...defaults, ...snapshot.policy };
-  const profileThresholds = ['development', 'tests', 'build'].flatMap((profile) =>
+  const factors = { development: 1, tests: 1.5, build: 2 };
+  const positive = (value) => Number.isFinite(value) && value > 0 ? value : null;
+  // With configs, threshold lines belong to a target; \kind\ then carries the target id the client filters on.
+  const profileThresholds = statusConfigs ? ['development', 'tests', 'build'].flatMap((profile) => statusConfigs.filter((item) => item.active).map((item) => {
+    const factor = item.scaleWithWorkload === false ? 1 : factors[profile];
+    return { profile, kind: text(item.name, 64), warningPrivateGiB: positive(item.warningPrivateGiB * factor), restartPrivateGiB: positive(item.actionPrivateGiB * factor) };
+  })) : ['development', 'tests', 'build'].flatMap((profile) =>
     ['editorServices', 'terminal', 'child'].map((kind) => {
       const effective = processPolicy({ ...policy, profile }, kind);
-      const positive = (value) => Number.isFinite(value) && value > 0 ? value : null;
       return { profile, kind, warningPrivateGiB: positive(effective.warningPrivateGiB), restartPrivateGiB: positive(effective.restartPrivateGiB) };
     }));
+  const countdownTarget = (snapshot.targets || []).find((item) => !item.primary && item.restartCountdown);
+  const configs = statusConfigs ? { profile: text(snapshot.configs.profile, 64), fallback: snapshot.configs.fallback === true,
+    configs: statusConfigs.map((item) => ({ name: text(item.name, 64), label: text(item.label, 80), file: text(item.file, 400), builtin: item.builtin === true,
+      active: item.active === true, automatic: item.automatic === true, needsApproval: item.needsApproval === true, mode: text(item.mode, 20),
+      restartCommand: text(item.restartCommand, 128), blockedBy: (item.blockedBy || []).slice(0, 8).map((reason) => text(reason, 120)), overrides: text(item.overrides, 400) })),
+    issues: (snapshot.configs.issues || []).slice(0, 50).map((issue) => ({ severity: text(issue.severity, 10), file: text(issue.file, 400), message: text(issue.message, 400) })),
+    warnings: (snapshot.configs.warnings || []).slice(0, 20).map((warning) => text(warning, 400)) } : null;
   return { state: String(snapshot.state || 'waiting').slice(0, 80), detail: String(snapshot.detail || '').slice(0, 2000),
-    profileThresholds,
+    profileThresholds, configs,
     profile: snapshot.profile || 'development', mode: snapshot.mode, sampleAgeSeconds: snapshot.processSampleAgeSeconds ?? null,
     processes: (snapshot.processes || []).slice(0, 256).map(process).filter(Boolean),
     history: (snapshot.history || []).slice(-200).map((entry) => ({ at: entry.at, sessionId: entry.sessionId,
       state: entry.state, decision: String(entry.decision || '').slice(0, 2000),
       processes: (entry.processes || (entry.sample ? [entry.sample] : [])).slice(0, 21).map(process).filter(Boolean) })),
-    capturedAt: Date.now(), restartCountdown: snapshot.restartCountdown, postponeUntil: snapshot.postponeUntil,
+    capturedAt: Date.now(), restartCountdown: snapshot.restartCountdown ? { ...snapshot.restartCountdown, label: 'Editor Services' } :
+      countdownTarget ? { ...countdownTarget.restartCountdown, label: text(countdownTarget.label, 80) } : null, postponeUntil: snapshot.postponeUntil,
     health: snapshot.health || {}, journalError: snapshot.journalError || null };
 }
 
@@ -53,7 +70,7 @@ function dashboardClient() {
   const date = (value) => value ? new Date(value).toLocaleString() : '—';
   const number = (value) => Number.isFinite(value) ? String(value) : '—';
   function clock() {
-    if (model.restartCountdown) $('countdown-text').textContent = `Editor Services restart in ${Math.max(0, Math.ceil((model.restartCountdown.deadline - Date.now()) / 1000))}s. Session state will be lost.`;
+    if (model.restartCountdown) $('countdown-text').textContent = `${model.restartCountdown.label} restart in ${Math.max(0, Math.ceil((model.restartCountdown.deadline - Date.now()) / 1000))}s. Its state will be lost.`;
     const age = model.sampleAgeSeconds;
     $('age').textContent = Number.isFinite(age) ? `Last process collection: ${metric(age + Math.max(0, Date.now() - model.capturedAt) / 1000, 0)}s ago.` : 'No current process collection.';
   }
@@ -80,7 +97,7 @@ function dashboardClient() {
     if (!points.length) { caption.textContent = 'No retained measurement. Missing values remain unknown.'; return; }
     const first = Math.min(...points.map((p) => p.at)); const last = Math.max(...points.map((p) => p.at));
     const span = Math.max(1000, last - first);
-    const thresholds = $('show-profiles').checked ? (model.profileThresholds || []).filter((p) => p.kind === known.get(selection)?.kind) : [];
+    const thresholds = $('show-profiles').checked ? (model.profileThresholds || []).filter((p) => p.kind === (known.get(selection)?.targetId || known.get(selection)?.kind)) : [];
     let max = 1;
     for (const p of points) max = Math.max(max, p.privateBytes || 0, p.workingSetBytes || 0);
     for (const p of thresholds) max = Math.max(max, (p.warningPrivateGiB || 0) * 1024 ** 3, (p.restartPrivateGiB || 0) * 1024 ** 3);
@@ -164,7 +181,7 @@ function dashboardClient() {
         button.title = `Select chart · created ${p.createdAt} · parent PID ${p.parentPid ?? 'unknown'}`;
         button.onclick = () => { selection = p.id; chart(); }; identity.append(button); row.append(identity);
         const growth = p.growth ? `${metric(p.growth.deltaMiB)} MiB / ${metric(p.growth.observedSeconds, 0)}s${p.growth.warning ? ' ⚠' : ''}` : '—';
-        for (const value of [p.kind, memory(p.privateBytes), memory(p.workingSetBytes), Number.isFinite(p.cpuPercent) ? `${metric(p.cpuPercent)}%` : '—', `${number(p.threadCount)} / ${number(p.handleCount)}`, growth, p.activity]) row.append(text('td', value));
+        for (const value of [p.targetLabel || p.kind, memory(p.privateBytes), memory(p.workingSetBytes), Number.isFinite(p.cpuPercent) ? `${metric(p.cpuPercent)}%` : '—', `${number(p.threadCount)} / ${number(p.handleCount)}`, growth, p.activity]) row.append(text('td', value));
         row.title = `Warning ${metric(p.thresholds.warningPrivateGiB)} GiB · high ${metric(p.thresholds.restartPrivateGiB)} GiB · CPU uses one logical core as 100%.`;
         const action = document.createElement('td'); const open = text('button', 'Open'); open.disabled = !p.terminalName;
         open.onclick = () => send('showTerminal', { identity: `${p.pid}:${p.createdAt}` }); action.append(open); row.append(action); body.append(row);
@@ -174,14 +191,14 @@ function dashboardClient() {
   }
 
   function render() {
-    $('state').textContent = `${model.state} · ${model.mode || '—'} · ${model.processes.length} pwsh`;
+    $('state').textContent = `${model.state} · ${model.mode || '—'} · ${model.processes.length} process(es)`;
     $('detail').textContent = model.detail;
     $('profile').value = model.profile;
     $('live-interval').value = String(model.liveIntervalMs || 0);
     $('live-status').textContent = model.liveIntervalMs > 0 ? `Live collection every ${model.liveIntervalMs < 1000 ? `${model.liveIntervalMs} ms` : `${model.liveIntervalMs / 1000} s`} after each completed collection, while this dashboard is visible.` : 'Live collection is off. The normal Watchdog collection schedule remains active.';
     const countdown = model.restartCountdown;
     $('countdown').hidden = !countdown;
-    $('countdown-text').textContent = countdown ? `Editor Services restart in ${Math.max(0, Math.ceil((countdown.deadline - Date.now()) / 1000))}s. Session state will be lost.` : '';
+    $('countdown-text').textContent = countdown ? `${countdown.label} restart in ${Math.max(0, Math.ceil((countdown.deadline - Date.now()) / 1000))}s. Its state will be lost.` : '';
     $('postponed').textContent = model.postponeUntil > Date.now() ? `Restarts postponed until ${date(model.postponeUntil)}.` : '';
     const health = model.health || {};
     $('health').replaceChildren();
@@ -196,7 +213,21 @@ function dashboardClient() {
     for (const [name, value] of pairs) $('health').append(text('dt', name), text('dd', value));
     const events = model.history.slice(-30).reverse().map((e) => text('li', `${date(e.at)} · ${e.state} · ${e.decision}`));
     $('events').replaceChildren(...events);
-    inventory(); chart(); clock();
+    configs(); inventory(); chart(); clock();
+  }
+  function configs() {
+    const status = model.configs;
+    $('configs-section').hidden = !status;
+    if (!status) return;
+    $('configs-profile').textContent = `Active profile: ${status.profile}${status.fallback ? ' (fallback: the configured profile does not exist; automatic restarts disabled)' : ''}.`;
+    const rows = status.configs.slice().sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name)).map((item) => {
+      const row = document.createElement('tr');
+      const state = !item.active ? 'available' : item.automatic ? 'active · automatic' : item.needsApproval ? 'active · needs approval' : `active · notify only${item.blockedBy.length ? ` (${item.blockedBy.join(', ')})` : ''}`;
+      for (const value of [item.name, item.label, state, item.restartCommand || '—', `${item.builtin ? 'built-in' : item.file}${item.overrides ? ` (overrides ${item.overrides})` : ''}`]) row.append(text('td', value));
+      return row;
+    });
+    $('configs').replaceChildren(...rows);
+    $('config-issues').replaceChildren(...[...status.issues.map((issue) => text('li', `${issue.severity} · ${issue.file}: ${issue.message}`)), ...status.warnings.map((warning) => text('li', `warning · ${warning}`))]);
   }
   $('profile').onchange = () => send('profile', { profile: $('profile').value });
   $('live-interval').onchange = () => send('liveInterval', { milliseconds: Number($('live-interval').value) });
@@ -215,11 +246,11 @@ function renderDashboardHtml() {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'"><title>Memory Watchdog · Live dashboard</title><style nonce="${nonce}">
 body{font-family:var(--vscode-font-family,system-ui);color:var(--vscode-foreground,#ddd);background:var(--vscode-editor-background,#181818);margin:0;padding:16px;line-height:1.45}main{max-width:1400px;margin:auto}h1{font-size:22px}h2{font-size:16px}section{border:1px solid var(--vscode-panel-border,#444);padding:14px;border-radius:8px;margin:14px 0}button,select{font:inherit;color:inherit;background:var(--vscode-dropdown-background,#333);border:1px solid var(--vscode-dropdown-border,#666);border-radius:4px;padding:5px 9px;max-width:100%}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:focus-visible,select:focus-visible{outline:2px solid var(--vscode-focusBorder,#55b5ef)}.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.muted{opacity:.8;font-size:12px}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--vscode-panel-border,#444)}th:first-child,td:first-child,td:nth-child(2){text-align:left}.group{text-align:left;background:var(--vscode-list-hoverBackground,#292929)}svg{width:100%;min-height:150px}dl{display:grid;grid-template-columns:minmax(100px,1fr) minmax(100px,2fr);gap:8px;font-size:12px}dd{margin:0;overflow-wrap:anywhere}dt{opacity:.8}li{overflow-wrap:anywhere;margin:8px 0}#countdown{border-color:#c79641}#process-select{width:100%}[hidden]{display:none!important}@media(max-width:400px){body{padding:8px}section{padding:9px}dl{grid-template-columns:1fr}dd{margin-bottom:6px}}
 </style></head><body><main><p class="muted">FRENCHEXDEV MEMORY WATCHDOG · LIVE · v${version}</p><h1>Window dashboard</h1><p id="state">Waiting for a snapshot…</p><p id="detail"></p>
-<p id="age" class="muted"></p><section id="live-controls" aria-labelledby="live-heading"><h2 id="live-heading">Live monitoring</h2><div class="toolbar"><label for="live-interval">Refresh interval</label><select id="live-interval"><option value="0">0 · Off</option><option value="2000">2 s</option><option value="5000">5 s</option></select><button id="refresh">Collect now</button></div><p id="live-status" class="muted" role="status">Live collection is off. Choose a refresh interval to enable it.</p></section><div class="toolbar"><button id="visualDiagnostics">Export HTML</button><button id="diagnostics">JSON diagnostics</button><label>Profile <select id="profile"><option value="development">Development · ×1</option><option value="tests">Tests · ×1.5</option><option value="build">Build · ×2</option></select></label></div>
+<p id="age" class="muted"></p><section id="live-controls" aria-labelledby="live-heading"><h2 id="live-heading">Live monitoring</h2><div class="toolbar"><label for="live-interval">Refresh interval</label><select id="live-interval"><option value="0">0 · Off</option><option value="2000">2 s</option><option value="5000">5 s</option></select><button id="refresh">Collect now</button></div><p id="live-status" class="muted" role="status">Live collection is off. Choose a refresh interval to enable it.</p></section><div class="toolbar"><button id="visualDiagnostics">Export HTML</button><button id="diagnostics">JSON diagnostics</button><label>Workload <select id="profile"><option value="development">Development · ×1</option><option value="tests">Tests · ×1.5</option><option value="build">Build · ×2</option></select></label></div>
 <section id="countdown" hidden aria-live="polite"><h2 id="countdown-text"></h2><div class="toolbar"><button id="cancelRestart">Cancel this episode</button><button id="postponeRestart">Postpone 5 minutes</button><button id="restartNow">Restart now</button></div></section><p id="postponed"></p>
 <section><h2>Memory history</h2><select id="process-select" aria-label="Chart process"></select><label><input id="show-profiles" type="checkbox" checked> Show all workload profiles</label><svg id="chart" viewBox="0 0 1000 210" role="img" aria-label="Private and resident memory over time with workload profile thresholds"></svg><ul id="chart-legend" class="muted"></ul><p id="chart-note" class="muted"></p></section>
-<section><h2>Owned pwsh processes</h2><div class="toolbar"><label>Sort <select id="sort"><option value="private">Private memory</option><option value="cpu">CPU</option><option value="pid">PID</option><option value="tree">Process tree</option></select></label><label>Kind <select id="kind"><option value="">All</option><option value="editorServices">Editor Services</option><option value="terminal">Terminal</option><option value="child">Child</option></select></label></div><div class="scroll"><table><thead><tr><th>PID</th><th>Kind</th><th>Private</th><th>Resident</th><th>CPU</th><th>Threads / handles</th><th>Growth</th><th>Activity</th><th>Terminal</th></tr></thead><tbody id="inventory"></tbody></table></div><p id="empty">No current process measurement.</p><p class="muted">Grouped by terminal/root. CPU: 100% = one logical core, can exceed 100%. Growth describes retained observations, not proof of a leak. Only verified Editor Services can restart automatically.</p></section>
-<section><h2>Watchdog health</h2><dl id="health"></dl></section><section><h2>Recent history</h2><ol id="events"></ol><p class="muted">Persisted history is workspace-scoped across sessions. Export HTML to inspect all retained entries. No command text, terminal output or working directory is collected.</p></section></main><script nonce="${nonce}">(${dashboardClient.toString()})();</script></body></html>`;
+<section><h2>Monitored processes</h2><div class="toolbar"><label>Sort <select id="sort"><option value="private">Private memory</option><option value="cpu">CPU</option><option value="pid">PID</option><option value="tree">Process tree</option></select></label><label>Kind <select id="kind"><option value="">All</option><option value="editorServices">Editor Services</option><option value="terminal">Terminal</option><option value="child">Child</option></select></label></div><div class="scroll"><table><thead><tr><th>PID</th><th>Target</th><th>Private</th><th>Resident</th><th>CPU</th><th>Threads / handles</th><th>Growth</th><th>Activity</th><th>Terminal</th></tr></thead><tbody id="inventory"></tbody></table></div><p id="empty">No current process measurement.</p><p class="muted">Grouped by terminal/root. CPU: 100% = one logical core, can exceed 100%. Growth describes retained observations, not proof of a leak. Automatic restarts: verified Editor Services, or a target with its own restart command when exactly one process matches it.</p></section>
+<section><h2>Watchdog health</h2><dl id="health"></dl></section><section id="configs-section" hidden><h2>Configs</h2><p id="configs-profile"></p><div class="scroll"><table><thead><tr><th>Name</th><th>Label</th><th>Status</th><th>Restart command</th><th>Source</th></tr></thead><tbody id="configs"></tbody></table></div><ul id="config-issues" class="muted"></ul></section><section><h2>Recent history</h2><ol id="events"></ol><p class="muted">Persisted history is workspace-scoped across sessions. Export HTML to inspect all retained entries. No command text, terminal output or working directory is collected.</p></section></main><script nonce="${nonce}">(${dashboardClient.toString()})();</script></body></html>`;
 }
 
 /** Share a live model between an activity-bar view and an optional editor panel. */
@@ -261,9 +292,9 @@ function createDashboard(vscode, { getSnapshot, onAction, onError = () => {}, ti
     void post(view.webview);
     schedule();
   };
-  const provider = vscode.window.registerWebviewViewProvider('powershellWatchdog.dashboardView', { resolveWebviewView: attach });
+  const provider = vscode.window.registerWebviewViewProvider('memoryWatchdog.dashboardView', { resolveWebviewView: attach });
   return {
-    open() { if (!panel) { panel = vscode.window.createWebviewPanel('powershellWatchdog.dashboard', 'Memory Watchdog · Live', vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: false }); attach(panel); } panel.reveal(); },
+    open() { if (!panel) { panel = vscode.window.createWebviewPanel('memoryWatchdog.dashboard', 'Memory Watchdog · Live', vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: false }); attach(panel); } panel.reveal(); },
     update,
     dispose() { disposed = true; timers.clearTimeout(timer); provider.dispose(); for (const view of [...views]) view.dispose(); views.clear(); },
   };
