@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "tsserver",
+  "label": "TypeScript server",
+  "description": "tsserver started by the built-in TypeScript extension. Usually two processes (syntax and semantic), so the restart stays manual.",
+  "match": { "processNames": ["*"], "ownership": "extensionHost", "commandLine": "[\\\\/]tsserver\\.js(?:[\"'\\s]|$)" },
+  "thresholds": { "warningPrivateGiB": 2, "actionPrivateGiB": 4, "consecutiveSamples": 3 },
+  "action": { "mode": "notifyOnly", "restartCommand": "typescript.restartTsServer" }
+}

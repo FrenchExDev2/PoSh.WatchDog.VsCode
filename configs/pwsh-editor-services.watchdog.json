@@ -1,0 +1,20 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "pwsh-editor-services",
+  "label": "PowerShell Editor Services",
+  "description": "The verified Editor Services process of the Microsoft PowerShell extension in this window.",
+  "adapter": "powershellEditorServices",
+  "thresholds": { "warningPrivateGiB": 4, "actionPrivateGiB": 8, "consecutiveSamples": 3 },
+  "action": {
+    "mode": "automatic",
+    "restartCommand": "PowerShell.RestartSession",
+    "graceSeconds": 30,
+    "cooldownSeconds": 120,
+    "maxPerHour": 3,
+    "timeoutSeconds": 45,
+    "deferWhileDebugging": ["PowerShell"],
+    "deferWhileRunningCommands": true,
+    "requireKnownIdle": false
+  }
+}
