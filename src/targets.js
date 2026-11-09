@@ -16,7 +16,13 @@ const SUFFIX = '.watchdog.json';
 const MAX_FILES = 200;
 const MAX_BYTES = 64 * 1024;
 const MAX_TARGETS = 32;
-const BUILTIN_PROFILES = Object.freeze({ default: Object.freeze(['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children']) });
+// Built-in profiles. Order matters: a process belongs to the first config of the profile that matches it,
+// so specific configs come before catch-all ones such as all-terminals. A user profile with the same name replaces one.
+const BUILTIN_PROFILES = Object.freeze(Object.fromEntries(Object.entries({
+  default: ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children'],
+  'powershell-full': ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children', 'all-terminals'],
+  minimal: ['pwsh-editor-services'],
+}).map(([name, list]) => [name, Object.freeze(list)])));
 const DEFAULT_PROFILE = 'default';
 const APPROVALS_KEY = 'memoryWatchdog.approvals';
 

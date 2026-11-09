@@ -259,7 +259,7 @@ async function activate(context) {
     const status = configState.status;
     const userProfiles = readCurrentGlobals().profiles || {};
     const items = (status?.profiles || ['default']).map((name) => ({ label: name, description: name === status?.profile ? 'active' : '',
-      detail: (name === 'default' && !Object.hasOwn(userProfiles, 'default') ? targets.BUILTIN_PROFILES.default : userProfiles[name] || []).join(', ') }));
+      detail: (Object.hasOwn(userProfiles, name) ? userProfiles[name] : targets.BUILTIN_PROFILES[name] || []).join(', ') }));
     const choice = await vscode.window.showQuickPick(items, { title: 'Active Memory Watchdog profile (define profiles in settings: frenchexdev.memoryWatchdog.profiles)' });
     if (choice) await updateSetting('activeProfile', choice.label);
   });

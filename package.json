@@ -237,7 +237,7 @@
         "frenchexdev.memoryWatchdog.activeProfile": {
           "type": "string",
           "default": "default",
-          "markdownDescription": "Profile monitored in every window. An unknown name falls back to `default` with automatic restarts disabled.",
+          "markdownDescription": "Profile monitored in every window: a built-in profile (`default`, `powershell-full`, `minimal`) or one of `#frenchexdev.memoryWatchdog.profiles#`. An unknown name falls back to `default` with automatic restarts disabled.",
           "scope": "machine"
         },
         "frenchexdev.powershellWatchdog.enabled": {

@@ -102,15 +102,24 @@ Commands: **Copy a Built-in Config to My Folder…** (to start an override), **O
 
 ## Profiles and workload
 
-A profile is a list of config names. The built-in `default` profile is `["pwsh-editor-services", "pwsh-terminals", "pwsh-children"]`.
+A profile is a list of config names. A process belongs to the **first** config of the active profile that matches it, so specific configs come before catch-all ones such as `all-terminals`.
+
+**Built-in profiles** (a user profile with the same name replaces the built-in one):
+
+| Profile | Configs, in matching order | Automatic restarts |
+| --- | --- | --- |
+| `default` | `pwsh-editor-services`, `pwsh-terminals`, `pwsh-children` | Editor Services |
+| `powershell-full` | `default` + `all-terminals` (alerts for every other shell) | Editor Services |
+| `minimal` | `pwsh-editor-services` only | Editor Services |
+<!-- built-in-profiles -->
 
 ```json
 {
   "frenchexdev.memoryWatchdog.profiles": {
-    "web": ["pwsh-editor-services", "pwsh-terminals", "tsserver", "node-build"],
-    "dotnet": ["pwsh-editor-services", "csharp", "all-terminals"]
+    "my-web": ["pwsh-editor-services", "pwsh-terminals", "tsserver", "node-build"],
+    "my-dotnet": ["pwsh-editor-services", "csharp", "all-terminals"]
   },
-  "frenchexdev.memoryWatchdog.activeProfile": "web"
+  "frenchexdev.memoryWatchdog.activeProfile": "my-web"
 }
 ```
 

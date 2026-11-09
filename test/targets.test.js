@@ -82,6 +82,27 @@ test('every built-in config is valid, cross-platform and matches its intended pr
     '/usr/bin/dotnet /home/u/.vscode/extensions/ms-dotnettools.csharp/.roslyn/Microsoft.CodeAnalysis.LanguageServer.dll']).matches, [true, true]);
 });
 
+test('every built-in profile lists existing built-in configs, specific configs before all-terminals', async () => {
+  const { configs } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
+  for (const [name, list] of Object.entries(targets.BUILTIN_PROFILES)) {
+    assert.ok(list.length > 0 && new Set(list).size === list.length, name);
+    for (const config of list) assert.ok(configs.has(config), `${name}: ${config}`);
+    if (list.includes('all-terminals')) assert.equal(list.at(-1), 'all-terminals', `${name}: the catch-all comes last`);
+    const resolved = targets.resolveProfile({}, name, configs);
+    assert.equal(resolved.fallback, false); assert.deepEqual(resolved.warnings, []);
+    assert.deepEqual(resolved.targets.map((entry) => entry.name), [...list]);
+    assert.ok(Object.isFrozen(list));
+  }
+});
+
+test('powershell-full and minimal profiles', async () => {
+  const { configs } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
+  assert.deepEqual(targets.resolveProfile({}, 'powershell-full', configs).targets.map((entry) => entry.name), ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children', 'all-terminals']);
+  assert.deepEqual(targets.resolveProfile({}, 'minimal', configs).targets.map((entry) => entry.name), ['pwsh-editor-services']);
+  assert.deepEqual(targets.resolveProfile({ minimal: ['tsserver'] }, 'minimal', configs).targets.map((entry) => entry.name), ['tsserver'], 'a user profile replaces a built-in one');
+  assert.ok(targets.resolveProfile({}, 'minimal', configs).available.includes('powershell-full'));
+});
+
 test('config paths expand ~, ${userHome} and ${env:NAME} and refuse relative or workspace paths', () => {
   const win = { platform: 'win32', home: 'C:\\Users\\jean', env: { OneDrive: 'D:\\OneDrive' } };
   assert.equal(targets.expandConfigPath('~\\watchdog', win).path, 'C:\\Users\\jean\\watchdog');
