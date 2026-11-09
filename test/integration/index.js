@@ -160,11 +160,11 @@ exports.run = async () => {
     report.observations.ordinaryHigh = ordinaryHigh;
     report.checks.push('A high-memory ordinary pwsh produces per-process warnings without restarting the editor session or closing that terminal.');
 
-    await vscode.commands.executeCommand('powershellWatchdog.disable');
+    await vscode.commands.executeCommand('memoryWatchdog.disable');
     await until(() => api.getSnapshot().policy.enabled === false, 'disable user setting');
     assert.equal(vscode.workspace.getConfiguration('frenchexdev.powershellWatchdog').inspect('enabled').globalValue, false);
     assert.equal(api.getSnapshot().state, 'disabled');
-    await vscode.commands.executeCommand('powershellWatchdog.enable');
+    await vscode.commands.executeCommand('memoryWatchdog.enable');
     await until(() => api.getSnapshot().policy.enabled === true, 'enable user setting');
     // A workspace attempt to escalate authority must be ignored by readPolicy.
     await assert.rejects(config.update('mode', 'automatic', vscode.ConfigurationTarget.Workspace));
@@ -175,7 +175,7 @@ exports.run = async () => {
     await sleep(1000);
     await until(() => api.getSnapshot().policy.mode === 'notifyOnly', 'machine-only policy');
     report.checks.push('Enable/disable persist as user settings; workspace mode override is ignored.');
-    await vscode.commands.executeCommand('powershellWatchdog.diagnostics');
+    await vscode.commands.executeCommand('memoryWatchdog.diagnostics');
     assert.equal(vscode.window.activeTextEditor.document.languageId, 'json');
     const diagnostic = JSON.parse(vscode.window.activeTextEditor.document.getText());
     assert.equal(diagnostic.policy.mode, 'notifyOnly');
@@ -186,13 +186,13 @@ exports.run = async () => {
       await api.sampleNow();
       return api.getSnapshot().processes.some((item) => item.pid === ordinaryPid);
     }, 'fresh inventory after policy configuration before exporting HTML');
-    const htmlUri = await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');
+    const htmlUri = await vscode.commands.executeCommand('memoryWatchdog.visualDiagnostics');
     assert.equal(htmlUri.scheme, 'file');
     const diagnosticTabs = () => vscode.window.tabGroups.all.flatMap((group) => group.tabs)
       .filter((tab) => tab.input instanceof vscode.TabInputWebview && tab.label === 'Memory Watchdog · Visual diagnostics');
     await until(() => diagnosticTabs().some((tab) => tab.isActive), 'visual diagnostic editor tab');
     assert.equal(diagnosticTabs().length, 1);
-    await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');
+    await vscode.commands.executeCommand('memoryWatchdog.visualDiagnostics');
     assert.equal(diagnosticTabs().length, 1);
     const html = await fs.readFile(htmlUri.fsPath, 'utf8');
     assert.ok(html.startsWith('<!doctype html>'));
@@ -212,7 +212,7 @@ exports.run = async () => {
     report.observations.snapshotProbe = { iterations: 10000, elapsedMs: performance.now() - start,
       heapDeltaBytes: process.memoryUsage().heapUsed - baseline,
       limitation: 'Short shared-host heap probe, not a stabilized or attributable watchdog memory benchmark.' };
-    await vscode.commands.executeCommand('powershellWatchdog.disable');
+    await vscode.commands.executeCommand('memoryWatchdog.disable');
     await until(() => api.getSnapshot().policy.enabled === false, 'disabled before editor restart');
     report.success = true;
   } catch (error) {
