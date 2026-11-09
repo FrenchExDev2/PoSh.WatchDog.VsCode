@@ -4,7 +4,8 @@ function reportClient(tools) {
   const report = JSON.parse(document.getElementById('report-data').textContent);
   const byId = (id) => document.getElementById(id);
   const GiB = 1073741824;
-  const number = (value) => Number.isFinite(value) ? (value / GiB).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' GiB' : 'Unknown';
+  const number = (value) => tools.formatBytes(value, 'Unknown');
+  const who = (process) => process.targetLabel || process.targetId || process.kind;
   const date = (value) => value == null ? 'Unknown' : new Date(value).toLocaleString();
   function element(tag, value, className) {
     const item = document.createElement(tag);
@@ -50,7 +51,7 @@ function reportClient(tools) {
   byId('quality').append(element('strong', 'Data coverage'), element('p', notes.join(' ')));
   const selector = byId('process-select');
   for (const process of report.series) {
-    const option = element('option', `PID ${process.pid} · ${process.kind} · ${date(process.createdAt)}`);
+    const option = element('option', `PID ${process.pid} · ${who(process)} · ${date(process.createdAt)}`);
     option.value = process.id; selector.append(option);
   }
   selector.disabled = !report.series.length;
@@ -80,18 +81,17 @@ function reportClient(tools) {
       return process ? process.thresholds?.[field] ?? entry[field] : null;
     };
     const thresholdValues = showThresholds ? report.entries.flatMap((item) => [threshold(item, 'warningPrivateGiB'), threshold(item, 'restartPrivateGiB')]).filter(Number.isFinite).map((value) => value * GiB) : [];
-    let peak = GiB / 100;
-    for (const point of allPoints) peak = Math.max(peak, point.value);
-    for (const value of thresholdValues) peak = Math.max(peak, value);
-    const maximum = peak * 1.12;
+    const peak = allPoints.reduce((top, point) => Math.max(top, point.value), 0);
+    const scale = tools.memoryScale(tools.scaleTop(peak, thresholdValues));
+    const maximum = scale.ceilingBytes;
     const x = (at) => 80 + (at - first) / (last - first) * 990;
     const y = (value) => 335 - value / maximum * 305;
-    for (let index = 0; index <= 4; index++) {
-      const value = maximum * index / 4;
-      svg.append(svgElement('line', { x1: 80, x2: 1070, y1: y(value), y2: y(value), class: 'grid' }),
-        svgElement('text', { x: 69, y: y(value) + 4, 'text-anchor': 'end', class: 'axis' }, (value / GiB).toFixed(2)));
+    for (const tick of scale.ticks) {
+      svg.append(svgElement('line', { x1: 80, x2: 1070, y1: y(tick.bytes), y2: y(tick.bytes), class: 'grid' }),
+        svgElement('text', { x: 69, y: y(tick.bytes) + 4, 'text-anchor': 'end', class: 'axis' }, tick.label.replace(/ [MG]iB$/, '')));
     }
-    svg.append(svgElement('text', { x: 25, y: 18, class: 'axis' }, 'GiB'));
+    svg.append(svgElement('text', { x: 25, y: 18, class: 'axis' }, scale.unit));
+    let offScale = false;
     for (let index = 0; index <= 4; index++) {
       const at = first + (last - first) * index / 4;
       const label = last - first > 86400000 ? new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(at).toLocaleTimeString();
@@ -103,12 +103,14 @@ function reportClient(tools) {
         let commands = '';
         for (const entry of report.entries) {
           const value = threshold(entry, field);
-          if (!Number.isFinite(value)) { previous = null; continue; }
+          // A segment above the axis would be drawn outside the plot: break it and say so in the note.
+          if (Number.isFinite(value) && value * GiB > maximum) offScale = true;
+          if (!Number.isFinite(value) || value * GiB > maximum) { previous = null; continue; }
           if (previous === null) commands += `M ${x(entry.at)} ${y(value * GiB)} `;
           else commands += `H ${x(entry.at)} V ${y(value * GiB)} `;
           previous = value;
         }
-        svg.append(svgElement('path', { d: commands, class: className }));
+        if (commands) svg.append(svgElement('path', { d: commands, class: className }));
       }
     }
     let drawn = 0;
@@ -134,10 +136,10 @@ function reportClient(tools) {
       const entry = left && Math.abs(report.entries[left - 1].at - at) < Math.abs(report.entries[left].at - at) ? report.entries[left - 1] : report.entries[left];
       const process = entry.processes.find((item) => item.id === identity) || (entry.sample?.id === identity ? entry.sample : null);
       cursor.setAttribute('x1', x(entry.at)); cursor.setAttribute('x2', x(entry.at)); cursor.setAttribute('visibility', 'visible');
-      byId('chart-readout').textContent = `Nearest retained collection: ${date(entry.at)} · Private: ${number(process?.privateBytes)} · Resident: ${number(process?.workingSetBytes)} · Warning: ${number(entry.warningPrivateGiB === null ? null : entry.warningPrivateGiB * GiB)} · High: ${number(entry.restartPrivateGiB === null ? null : entry.restartPrivateGiB * GiB)}`;
+      byId('chart-readout').textContent = `Nearest retained collection: ${date(entry.at)} · Private: ${number(process?.privateBytes)} · Resident: ${number(process?.workingSetBytes)} · Warning: ${number(Number.isFinite(threshold(entry, 'warningPrivateGiB')) ? threshold(entry, 'warningPrivateGiB') * GiB : null)} · High: ${number(Number.isFinite(threshold(entry, 'restartPrivateGiB')) ? threshold(entry, 'restartPrivateGiB') * GiB : null)}`;
     };
     byId('chart-readout').textContent = `PID ${selected.pid} · Observed private peak ${number(selected.peakPrivateBytes)} · Resident peak ${number(selected.peakResidentBytes)}`;
-    byId('chart-note').textContent = `${privateSegments.length} private-memory segment(s). Gaps remain disconnected. ${drawn.toLocaleString()} plotted points; full retained observations remain embedded. Amber: warning threshold. Red: high threshold (restart only for verified Editor Services).`;
+    byId('chart-note').textContent = `${privateSegments.length} private-memory segment(s). Gaps remain disconnected. ${drawn.toLocaleString()} plotted points; full retained observations remain embedded. Amber: warning threshold. Red: high threshold (automatic restart only where the target allows it).${offScale ? ' Thresholds above twice the observed peak are not drawn so the curves stay readable.' : ''}`;
   }
   selector.addEventListener('change', draw);
   byId('thresholds').addEventListener('change', draw);
@@ -147,12 +149,12 @@ function reportClient(tools) {
   if (!largest.length) byId('ranking').append(element('p', 'No observed peaks yet.', 'empty'));
   for (const process of largest) {
     const row = element('div', undefined, 'rank');
-    const button = element('button', `PID ${process.pid} · ${process.kind}`, 'process-link');
+    const button = element('button', `PID ${process.pid} · ${who(process)}`, 'process-link');
     button.type = 'button'; button.addEventListener('click', () => { selector.value = process.id; draw(); byId('memory-chart').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
     row.append(button, element('span', number(process.peakPrivateBytes)));
     const bar = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     bar.setAttribute('viewBox', '0 0 100 4'); bar.setAttribute('aria-hidden', 'true');
-    bar.append(svgElement('rect', { width: 100, height: 4, rx: 2, class: 'bar-track' }), svgElement('rect', { width: Math.max(0, (process.peakPrivateBytes || 0) / maximum * 100), height: 4, rx: 2, class: 'bar-value' }));
+    bar.append(svgElement('rect', { width: 100, height: 4, rx: 2, class: 'bar-track' }), svgElement('rect', { width: Math.min(100, Math.max(0, (process.peakPrivateBytes || 0) / maximum * 100)), height: 4, rx: 2, class: 'bar-value' }));
     row.append(bar); byId('ranking').append(row);
   }
   let eventPage = 0;
@@ -176,10 +178,10 @@ function reportClient(tools) {
   byId('inventory-note').textContent = current.available ? `${current.complete ? 'Complete' : 'Partial'} current inventory · ${current.mode} · ${current.detail}` : `Current measurements unavailable · ${current.detail}`;
   for (const process of current.processes) {
     const row = element('tr');
-    for (const value of [`${process.pid} / ${date(process.createdAt)}`, process.kind, number(process.privateBytes), number(process.workingSetBytes), process.automaticRestart ? 'Verified Editor Services' : 'Alerts only']) row.append(element('td', value));
+    for (const value of [`${process.pid} / ${date(process.createdAt)}`, who(process), number(process.privateBytes), number(process.workingSetBytes), process.automaticRestart ? 'Automatic restart' : 'Alerts only']) row.append(element('td', value));
     byId('inventory').append(row);
   }
-  if (!current.processes.length) { const row = element('tr'); const cell = element('td', current.available && current.complete ? 'No pwsh process in this window.' : 'No current process measurement available.'); cell.colSpan = 5; row.append(cell); byId('inventory').append(row); }
+  if (!current.processes.length) { const row = element('tr'); const cell = element('td', current.available && current.complete ? 'No monitored process in this window.' : 'No current process measurement available.'); cell.colSpan = 5; row.append(cell); byId('inventory').append(row); }
   for (const [key, value] of Object.entries(report.environment)) byId('environment').append(element('dt', key), element('dd', value ?? 'Unknown'));
   document.documentElement.dataset.reportReady = 'true';
 }

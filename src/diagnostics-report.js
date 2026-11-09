@@ -20,7 +20,8 @@ function normalizeProcess(value) {
     state: text(value.state, 80), parentPid: finite(value.parentPid), rootPid: finite(value.rootPid),
     cpuPercent: finite(value.cpuPercent), threadCount: finite(value.threadCount), handleCount: finite(value.handleCount),
     thresholds: { warningPrivateGiB: finite(value.thresholds?.warningPrivateGiB), restartPrivateGiB: finite(value.thresholds?.restartPrivateGiB) },
-    ...(typeof value.targetId === 'string' && value.targetId ? { targetId: text(value.targetId, 64) } : {}) };
+    ...(typeof value.targetId === 'string' && value.targetId ? { targetId: text(value.targetId, 64) } : {}),
+    ...(typeof value.targetLabel === 'string' && value.targetLabel ? { targetLabel: text(value.targetLabel, 80) } : {}) };
 }
 
 function normalizeEntry(value) {
@@ -53,7 +54,7 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
   const include = (process, at) => {
     let item = series.get(process.id);
     if (!item) {
-      item = { id: process.id, pid: process.pid, createdAt: process.createdAt, kind: process.kind,
+      item = { id: process.id, pid: process.pid, createdAt: process.createdAt, kind: process.kind, targetId: process.targetId || null, targetLabel: process.targetLabel || null,
         peakPrivateBytes: null, peakResidentBytes: null, firstAt: at, lastAt: at };
       series.set(item.id, item);
     }
@@ -62,6 +63,8 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
     }
     item.firstAt = Math.min(item.firstAt, at); item.lastAt = Math.max(item.lastAt, at);
     if (process.kind !== 'unknown') item.kind = process.kind;
+    if (process.targetId) item.targetId = process.targetId;
+    if (process.targetLabel) item.targetLabel = process.targetLabel;
   };
   for (const entry of entries) {
     for (const process of entry.processes) include(process, entry.at);
