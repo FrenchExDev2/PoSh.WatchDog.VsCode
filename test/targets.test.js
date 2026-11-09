@@ -7,7 +7,29 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const targets = require('../src/targets');
-const { testPattern } = require('../src/selection');
+const selection = require('../src/selection');
+const { testPattern } = selection;
+
+const { normalizeName } = require('../src/platform');
+
+// Built-in automatic restart commands and where each ID was verified (contributes.commands of the extension manifest).
+const VERIFIED_AUTOMATIC = {
+  'pwsh-editor-services': 'PowerShell.RestartSession', // ms-vscode.PowerShell (0.5.x qualification)
+  'eslint': 'eslint.restart',
+  'tsgo': 'typescript.native-preview.restart',
+  // verified-automatic-end
+};
+
+/** Match fixture processes of one OS against a built-in profile: host PID 2, terminal shells listed in `terminals`. */
+async function matchBuiltin(profile, platform, processes, terminals = []) {
+  const { configs } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
+  const resolved = targets.resolveProfile({}, profile, configs);
+  const entries = processes.map(([pid, ppid, name, commandLine = null]) => ({ proc: { pid, ppid, name: normalizeName(name, platform), commandLine }, rootPid: ppid }));
+  const { assigned, errors } = selection.matchTargets(entries, resolved.targets.map((entry) => targets.collectorTarget(entry)),
+    { hostProcessId: 2, terminalProcessIds: new Set(terminals), platform });
+  assert.deepEqual(errors, []);
+  return Object.fromEntries(processes.map(([pid]) => [pid, assigned.get(pid) || null]));
+}
 
 const valid = (extra = {}) => ({ schemaVersion: 1, name: 'node-build', label: 'Node build', match: { processNames: ['node'], ownership: 'child' },
   thresholds: { warningPrivateGiB: 2, actionPrivateGiB: 3 }, ...extra });
@@ -66,11 +88,13 @@ test('the JSON schema and the runtime validator accept the same properties', asy
 test('every built-in config is valid, cross-platform and matches its intended processes', async () => {
   const { configs, issues } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
   assert.deepEqual(issues, []);
-  assert.deepEqual([...configs.keys()].sort(), ['all-terminals', 'csharp', 'pwsh-children', 'pwsh-editor-services', 'pwsh-terminals', 'tsserver']);
+  assert.deepEqual([...configs.keys()].sort(), ['all-terminals', 'csharp', 'eslint', 'node-tools', 'pwsh-children', 'pwsh-editor-services', 'pwsh-terminals', 'tsgo', 'tsserver']);
   for (const entry of configs.values()) {
     assert.equal(entry.builtin, true);
     for (const name of entry.config.match?.processNames || []) assert.ok(!/\.exe$/i.test(name), `${entry.name} names must not be Windows-only`);
-    if (entry.name !== 'pwsh-editor-services') assert.equal(entry.config.action.mode, 'notifyOnly', entry.name);
+    // Automatic only with a restart command verified against the owning extension's package.json (see VERIFIED_AUTOMATIC).
+    if (entry.config.action.mode === 'automatic') assert.equal(entry.config.action.restartCommand, VERIFIED_AUTOMATIC[entry.name], `${entry.name}: unverified automatic restart`);
+    else assert.ok(!VERIFIED_AUTOMATIC[entry.name], `${entry.name}: listed as automatic but notify-only`);
   }
   assert.deepEqual(targets.BUILTIN_PROFILES.default, ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children']);
   const tsserver = configs.get('tsserver').config.match.commandLine;
@@ -200,4 +224,37 @@ test('automatic user restart commands need approval of the exact content, and tr
   const fixed = { ...item, config: { ...item.config, scaleWithWorkload: false } };
   assert.equal(targets.targetPolicy(fixed, globals, { approvals, platform: 'win32' }).policy.profile, 'development');
   assert.deepEqual(Object.keys(targets.collectorTarget(item)).sort(), ['adapter', 'commandLine', 'name', 'ownership', 'processNames']);
+});
+
+test('wave 2 configs: ESLint server and tsgo command lines on every OS', async () => {
+  const { configs } = await targets.loadConfigs({ builtinDirectory: path.join(__dirname, '..', 'configs') });
+  assert.deepEqual(testPattern(configs.get('eslint').config.match.commandLine, [
+    '"C:\\Users\\u\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe" c:\\Users\\u\\.vscode\\extensions\\dbaeumer.vscode-eslint-3.0.34\\server\\out\\eslintServer.js --node-ipc --clientProcessId=12',
+    '/usr/share/code/code /home/u/.vscode/extensions/dbaeumer.vscode-eslint-3.0.34/server/out/eslintServer.js --node-ipc',
+    '/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) /Users/u/.vscode/extensions/dbaeumer.vscode-eslint-3.0.34/server/out/eslintServer.js',
+    'node /repo/node_modules/eslint/bin/eslint.js .']).matches, [true, true, true, false]);
+  assert.deepEqual(testPattern(configs.get('tsgo').config.match.commandLine, ['c:\\x\\lib\\tsgo.exe --lsp --stdio', '/x/lib/tsgo --lsp', 'tsgo --build', 'tsgo --lspx']).matches, [true, true, false, false]);
+});
+
+test('web profile assigns language servers, builds and other shells on Windows, Linux and macOS', async () => {
+  const eslint = (prefix) => prefix + '/ext/dbaeumer.vscode-eslint-3.0.34/server/out/eslintServer.js --node-ipc';
+  const cases = {
+    win32: [[10, 2, 'Code - Insiders.exe', eslint('"C:\\Code.exe" c:')], [11, 2, 'Code - Insiders.exe', '"C:\\Code.exe" "c:\\ts\\lib\\tsserver.js" --serverMode partialSemantic'],
+      [12, 2, 'tsgo.exe', 'C:\\x\\tsgo.exe --lsp --stdio'], [20, 2, 'pwsh.exe'], [21, 20, 'node.exe', 'node build.js'], [22, 20, 'git.exe'], [23, 2, 'Code - Insiders.exe', 'C:\\Code.exe other.js']],
+    linux: [[10, 2, 'code', eslint('/usr/share/code/code /home/u')], [11, 2, 'code', '/usr/share/code/code /x/typescript/lib/tsserver.js'],
+      [12, 2, 'tsgo', '/x/tsgo --lsp --stdio'], [20, 2, 'bash'], [21, 20, 'node', 'node build.js'], [22, 20, 'git'], [23, 2, 'code', '/usr/share/code/code other.js']],
+    darwin: [[10, 2, 'Code Helper (Plugin)', eslint('/A/Code Helper (Plugin) /Users/u')], [11, 2, 'Code Helper (Plugin)', '/A/Code Helper (Plugin) /x/tsserver.js'],
+      [12, 2, 'tsgo', '/x/tsgo --lsp --stdio'], [20, 2, 'zsh'], [21, 20, 'node', 'node build.js'], [22, 20, 'git'], [23, 2, 'Code Helper (Plugin)', '/A/Code Helper other.js']],
+  };
+  for (const [platform, processes] of Object.entries(cases)) {
+    assert.deepEqual(await matchBuiltin('web', platform, processes, [20]),
+      { 10: 'eslint', 11: 'tsserver', 12: 'tsgo', 20: 'all-terminals', 21: 'node-tools', 22: null, 23: null }, platform);
+  }
+});
+
+test('dotnet profile assigns Roslyn and pwsh terminals on Windows and Linux', async () => {
+  assert.deepEqual(await matchBuiltin('dotnet', 'win32', [[30, 2, 'Microsoft.CodeAnalysis.LanguageServer.exe', 'C:\\u\\.roslyn\\Microsoft.CodeAnalysis.LanguageServer.exe --logLevel Information'],
+    [31, 2, 'pwsh.exe'], [32, 2, 'bash.exe']], [31, 32]), { 30: 'csharp', 31: 'pwsh-terminals', 32: null });
+  assert.deepEqual(await matchBuiltin('dotnet', 'linux', [[30, 2, 'dotnet', '/usr/bin/dotnet /home/u/.roslyn/Microsoft.CodeAnalysis.LanguageServer.dll'], [31, 2, 'pwsh']], [31]),
+    { 30: 'csharp', 31: 'pwsh-terminals' });
 });

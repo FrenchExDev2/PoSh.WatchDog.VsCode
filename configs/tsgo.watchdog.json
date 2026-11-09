@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "tsgo",
+  "label": "TypeScript native preview (tsgo)",
+  "description": "tsgo --lsp started by the TypeScript native preview extension (TypeScriptTeam.native-preview). Restart command verified in native-preview 1.0.2.",
+  "match": { "processNames": ["tsgo"], "ownership": "extensionHost", "commandLine": "(?:^|\\s)--lsp(?:\\s|$)" },
+  "thresholds": { "warningPrivateGiB": 3, "actionPrivateGiB": 6, "consecutiveSamples": 3 },
+  "action": { "mode": "automatic", "restartCommand": "typescript.native-preview.restart", "graceSeconds": 30, "cooldownSeconds": 300, "maxPerHour": 2, "timeoutSeconds": 60, "deferWhileDebugging": [], "deferWhileRunningCommands": false, "requireKnownIdle": false }
+}

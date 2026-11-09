@@ -92,7 +92,12 @@ A config is one JSON file named `<name>.watchdog.json` describing **one target**
 | `pwsh-children` | Nested `pwsh` processes | Alerts |
 | `tsserver` | TypeScript server (`tsserver.js`, child of the extension host) | Alerts; `typescript.restartTsServer` declared but notify-only (usually two processes) |
 | `csharp` | C# Roslyn language server (`Microsoft.CodeAnalysis.LanguageServer`) | Alerts; `dotnet.restartServer` declared but notify-only |
+| `eslint` | ESLint server (`eslintServer.js` of dbaeumer.vscode-eslint) | Automatic restart through `eslint.restart` |
+| `tsgo` | TypeScript native preview language server (`tsgo --lsp`) | Automatic restart through `typescript.native-preview.restart` |
+| `node-tools` | `node`, `bun`, `deno` started from a terminal or an extension (builds, tests, dev servers) | Alerts |
 | `all-terminals` | Every terminal shell, whatever the shell | Alerts |
+
+Built-in automatic restart commands were checked against `contributes.commands` in the owning extension's `package.json` (version noted in each config's `description`). A built-in config with a restart command but several processes per window (`tsserver`) stays notify-only. Automatic restarts also need exactly one matching process in the window.
 
 **Where configs are loaded from**, in order: the built-ins, then `~/.frenchexdev/memory-watchdog/` (created on demand), then each folder of `frenchexdev.memoryWatchdog.configPaths`. When two files share a name the last one wins; the Output log and the dashboard show which file overrides which. `configPaths` accepts only absolute paths after expanding `~`, `${userHome}` and `${env:NAME}`; relative paths and `${workspaceFolder}` are rejected. `~/...` works on every OS.
 
@@ -111,6 +116,8 @@ A profile is a list of config names. A process belongs to the **first** config o
 | `default` | `pwsh-editor-services`, `pwsh-terminals`, `pwsh-children` | Editor Services |
 | `powershell-full` | `default` + `all-terminals` (alerts for every other shell) | Editor Services |
 | `minimal` | `pwsh-editor-services` only | Editor Services |
+| `dotnet` | `csharp`, `pwsh-editor-services`, `pwsh-terminals` | Editor Services |
+| `web` | `tsserver`, `tsgo`, `eslint`, `node-tools`, `all-terminals` | ESLint server, tsgo |
 <!-- built-in-profiles -->
 
 ```json

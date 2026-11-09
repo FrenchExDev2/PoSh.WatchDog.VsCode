@@ -22,6 +22,8 @@ const BUILTIN_PROFILES = Object.freeze(Object.fromEntries(Object.entries({
   default: ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children'],
   'powershell-full': ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children', 'all-terminals'],
   minimal: ['pwsh-editor-services'],
+  dotnet: ['csharp', 'pwsh-editor-services', 'pwsh-terminals'],
+  web: ['tsserver', 'tsgo', 'eslint', 'node-tools', 'all-terminals'],
 }).map(([name, list]) => [name, Object.freeze(list)])));
 const DEFAULT_PROFILE = 'default';
 const APPROVALS_KEY = 'memoryWatchdog.approvals';

@@ -13,7 +13,7 @@ test('vsce would package configs, schema and runtime sources only', { timeout: 1
   const vsce = path.join(root, 'node_modules', '@vscode', 'vsce', 'vsce');
   const { stdout } = await promisify(execFile)(process.execPath, [vsce, 'ls', '--no-dependencies'], { cwd: root, maxBuffer: 4 * 1024 * 1024 });
   const files = stdout.split(/\r?\n/).map((line) => line.trim().replace(/\\/g, '/')).filter(Boolean);
-  for (const name of ['pwsh-editor-services', 'pwsh-terminals', 'pwsh-children', 'tsserver', 'csharp', 'all-terminals']) {
+  for (const name of ['all-terminals', 'csharp', 'eslint', 'node-tools', 'pwsh-children', 'pwsh-editor-services', 'pwsh-terminals', 'tsgo', 'tsserver']) {
     assert.ok(files.includes(`configs/${name}.watchdog.json`), `configs/${name}.watchdog.json missing`);
   }
   assert.ok(files.includes('schemas/watchdog-config.schema.json'));
