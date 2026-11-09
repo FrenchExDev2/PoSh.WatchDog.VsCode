@@ -7,9 +7,11 @@ const MiB = 1024 ** 2;
 class TrendTracker {
   constructor() { this.entries = new Map(); }
 
-  update(processes, policy, now) {
+  /** policyFor is a policy object or a function returning the policy of one sample's target. */
+  update(processes, policyFor, now) {
     const live = new Set();
     for (const sample of processes) {
+      const policy = typeof policyFor === 'function' ? policyFor(sample) : policyFor;
       const key = identityKey(sample); live.add(key);
       let entry = this.entries.get(key);
       const gap = (policy.sampleIntervalSeconds * 2.5 + policy.collectTimeoutSeconds) * 1000;

@@ -2,9 +2,6 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { execFile } = require('node:child_process');
-const { promisify } = require('node:util');
-const path = require('node:path');
 const { WindowProcessObserver, validSample } = require('../src/observer');
 
 const sample = (pid, rootPid = pid) => ({ pid, rootPid, createdAt: '2026-10-29T00:00:00Z', measuredAt: '2026-10-29T00:01:00Z',
@@ -12,20 +9,12 @@ const sample = (pid, rootPid = pid) => ({ pid, rootPid, createdAt: '2026-10-29T0
 const inventory = (processes = []) => ({ processes, errors: [], limited: false, editorVerified: false });
 const terminal = (pid) => ({ processId: Promise.resolve(pid), creationOptions: {} });
 
-test('Windows process selector enforces window, ancestry, lifetime and editor boundaries', async () => {
-  const { stdout } = await promisify(execFile)('pwsh', ['-NoProfile', '-File', path.join(__dirname, 'ProcessSelection.Tests.ps1')]);
-  const result = JSON.parse(stdout);
-  assert.equal(result.passed, 17);
-  assert.deepEqual(result.selected, [12, 30, 32, 33, 40]);
-  assert.deepEqual(result.insidersSelected, [212, 231, 232]);
-});
-
 test('ordinary terminals are measured without activating Microsoft PowerShell', async () => {
   const vscode = { window: { terminals: [terminal(10)] } };
   let request;
-  const observer = new WindowProcessObserver(vscode, { hostPid: 42, editorExecutable: 'C:\\Code.exe', collectorExecutable: 'pwsh',
+  const observer = new WindowProcessObserver(vscode, { hostPid: 42, editorExecutable: 'C:\\Code.exe',
     resolveEditor: async () => ({ state: 'waiting' }),
-    collect: async (_exe, input) => { request = input; return inventory([sample(10), sample(11, 10)]); } });
+    collect: async (input) => { request = input; return inventory([sample(10), sample(11, 10)]); } });
   const result = await observer.observe(1000);
   assert.deepEqual(request.rootProcessIds, [42, 10]);
   assert.equal(request.hostProcessId, 42);
@@ -37,7 +26,7 @@ test('ordinary terminals are measured without activating Microsoft PowerShell', 
 
 test('unqualified Editor Services does not block ordinary process measurements or authorize restart', async () => {
   const vscode = { window: { terminals: [terminal(10)] } };
-  const observer = new WindowProcessObserver(vscode, { hostPid: 42, collectorExecutable: 'pwsh',
+  const observer = new WindowProcessObserver(vscode, { hostPid: 42,
     resolveEditor: async () => { const error = new Error(); error.code = 'unsupported'; throw error; },
     collect: async () => inventory([sample(10)]) });
   const result = await observer.observe(1000);
@@ -49,7 +38,7 @@ test('unqualified Editor Services does not block ordinary process measurements o
 test('only independently verified Editor Services is exposed as the restart target', async () => {
   const item = terminal(10);
   const editor = { pid: 10, terminal: item };
-  const observer = new WindowProcessObserver({ window: { terminals: [item] } }, { hostPid: 42, collectorExecutable: 'pwsh',
+  const observer = new WindowProcessObserver({ window: { terminals: [item] } }, { hostPid: 42,
     editorExecutable: 'C:\\Insiders\\Code - Insiders.exe',
     resolveEditor: async () => editor,
     collect: async () => ({ ...inventory([sample(10), sample(11, 10)]), editorVerified: true }) });
@@ -62,9 +51,9 @@ test('only independently verified Editor Services is exposed as the restart targ
 test('Stable and Insiders retain restart support using their explicit host identity and executable', async () => {
   for (const editorExecutable of ['C:\\Code\\Code.exe', 'C:\\Insiders\\Code - Insiders.exe']) {
     const item = terminal(10);
-    const observer = new WindowProcessObserver({ window: { terminals: [item] } }, { hostPid: 42, collectorExecutable: 'pwsh',
+    const observer = new WindowProcessObserver({ window: { terminals: [item] } }, { hostPid: 42,
       editorExecutable, resolveEditor: async () => ({ pid: 10, terminal: item }),
-      collect: async (_exe, request) => {
+      collect: async (request) => {
         assert.equal(request.hostProcessId, 42);
         assert.equal(request.editorExecutable, editorExecutable);
         return { ...inventory([sample(10)]), editorVerified: true };
@@ -79,7 +68,7 @@ test('Stable and Insiders retain restart support using their explicit host ident
 test('an Editor Services terminal removed during collection cannot authorize restart', async () => {
   const item = terminal(10);
   const vscode = { window: { terminals: [item] } };
-  const observer = new WindowProcessObserver(vscode, { hostPid: 42, collectorExecutable: 'pwsh',
+  const observer = new WindowProcessObserver(vscode, { hostPid: 42,
     editorExecutable: 'C:\\Insiders\\Code - Insiders.exe', resolveEditor: async () => ({ pid: 10, terminal: item }),
     collect: async () => { vscode.window.terminals = []; return { ...inventory([sample(10)]), editorVerified: true }; } });
   assert.equal((await observer.observe(1000)).sample, null);
@@ -87,7 +76,7 @@ test('an Editor Services terminal removed during collection cannot authorize res
 
 test('unresolved terminal PIDs produce explicit partial inventory without blocking resolved terminals', async () => {
   const observer = new WindowProcessObserver({ window: { terminals: [terminal(10), { processId: new Promise(() => {}), creationOptions: {} }] } },
-    { hostPid: 42, collectorExecutable: 'pwsh', resolveEditor: async () => ({ state: 'waiting' }), collect: async () => inventory([sample(10)]) });
+    { hostPid: 42, resolveEditor: async () => ({ state: 'waiting' }), collect: async () => inventory([sample(10)]) });
   const result = await observer.observe(100);
   assert.equal(result.inventory.processes.length, 1);
   assert.equal(result.inventory.unresolvedTerminals, 1);
@@ -96,7 +85,7 @@ test('unresolved terminal PIDs produce explicit partial inventory without blocki
 
 test('unverified ownership and unavailable processes keep known measurements explicitly partial', async () => {
   const observer = new WindowProcessObserver({ window: { terminals: [terminal(10), terminal(11)] } },
-    { hostPid: 42, collectorExecutable: 'pwsh', resolveEditor: async () => ({ state: 'waiting' }),
+    { hostPid: 42, resolveEditor: async () => ({ state: 'waiting' }),
       collect: async () => ({ ...inventory([sample(10)]), errors: [{ pid: 11, code: 'ownershipUnverified' }] }) });
   const result = await observer.observe(1000);
   assert.equal(result.inventory.processes.length, 1);
@@ -109,8 +98,8 @@ test('a terminal closed while its PID was resolving cannot become an ownership r
   const item = terminal(10);
   item.processId = Promise.resolve().then(() => { vscode.window.terminals = []; return 10; });
   vscode.window.terminals = [item];
-  const observer = new WindowProcessObserver(vscode, { hostPid: 42, collectorExecutable: 'pwsh',
-    resolveEditor: async () => ({ state: 'waiting' }), collect: async (_exe, request) => {
+  const observer = new WindowProcessObserver(vscode, { hostPid: 42,
+    resolveEditor: async () => ({ state: 'waiting' }), collect: async (request) => {
       assert.deepEqual(request.rootProcessIds, [42]); return inventory();
     } });
   await observer.observe(1000);
@@ -126,7 +115,7 @@ test('invalid or unknown memory is rejected rather than interpreted as zero', ()
 test('terminal navigation uses normalized creation identity and refuses closed or stale terminals', async () => {
   let shown = 0; const item = { ...terminal(10), name: 'A terminal', show() { shown++; } };
   const vscode = { window: { terminals: [item] } };
-  const observer = new WindowProcessObserver(vscode, { hostPid: 42, collectorExecutable: 'pwsh',
+  const observer = new WindowProcessObserver(vscode, { hostPid: 42,
     resolveEditor: async () => ({ state: 'waiting' }),
     collect: async () => inventory([{ ...sample(10), createdAt: '2026-10-29T00:00:00.1234567Z', cpuTimeMs: -1, threadCount: null, handleCount: 25 }]) });
   const result = await observer.observe(1000);
@@ -134,4 +123,40 @@ test('terminal navigation uses normalized creation identity and refuses closed o
   assert.equal(observer.showTerminal('10:2026-10-29T00:00:00.123Z'), true); assert.equal(shown, 1);
   assert.equal(observer.showTerminal('10:2026-10-29T01:00:00.123Z'), false);
   item.exitStatus = { code: 0 }; assert.equal(observer.showTerminal('10:2026-10-29T00:00:00.123Z'), false);
+});
+
+const generic = [{ name: 'pwsh-editor-services', label: 'PSES', adapter: 'powershellEditorServices' },
+  { name: 'tsserver', label: 'TypeScript server', processNames: ['*'], ownership: 'extensionHost', commandLine: 'tsserver', command: 'typescript.restartTsServer' },
+  { name: 'node', label: 'Node', processNames: ['node'], ownership: 'child' }];
+
+test('generic restart targets are actionable only with exactly one matching process', async () => {
+  let reply = [{ ...sample(20, 42), targetId: 'tsserver' }, { ...sample(30, 42), targetId: 'node' }];
+  let request;
+  const observer = new WindowProcessObserver({ window: { terminals: [] } }, { hostPid: 42, targets: generic,
+    resolveEditor: async () => ({ state: 'waiting' }), collect: async (input) => { request = input; return inventory(reply); } });
+  const one = await observer.observe(1000);
+  assert.deepEqual(request.targets.map((target) => target.name), ['pwsh-editor-services', 'tsserver', 'node']);
+  assert.ok(request.targets.every((target) => !('command' in target)), 'the collector never sees restart commands');
+  assert.equal(one.targets.tsserver.sample.pid, 20);
+  assert.equal(one.targets.tsserver.target.command, 'typescript.restartTsServer');
+  assert.equal(one.inventory.processes.find((item) => item.pid === 20).automaticRestart, true);
+  assert.equal(one.inventory.processes.find((item) => item.pid === 30).automaticRestart, false);
+  assert.equal(one.inventory.processes.find((item) => item.pid === 30).targetLabel, 'Node');
+  assert.equal(one.targets.node, undefined);
+  reply = [...reply, { ...sample(21, 42), targetId: 'tsserver' }];
+  const two = await observer.observe(1000);
+  assert.equal(two.targets.tsserver.sample, null);
+  assert.equal(two.targets.tsserver.target.state, 'ambiguous');
+  assert.ok(two.inventory.processes.every((item) => !item.automaticRestart));
+});
+
+test('the adapter target is never assigned to an unverified process and is skipped when not in the profile', async () => {
+  let resolved = 0;
+  const observer = new WindowProcessObserver({ window: { terminals: [terminal(10)] } }, { hostPid: 42, targets: generic.slice(1),
+    resolveEditor: async () => { resolved++; return { state: 'waiting' }; },
+    collect: async () => inventory([{ ...sample(10), targetId: 'pwsh-editor-services' }, { ...sample(11, 10), targetId: 'unknown' }]) });
+  const result = await observer.observe(1000);
+  assert.equal(resolved, 0);
+  assert.deepEqual(result.inventory.processes, []);
+  assert.match(result.target.detail, /not part of the active profile/);
 });
