@@ -157,7 +157,7 @@ class PolicyEngine {
       this.resetSeries();
       return { ...base, state: 'deferred', detail: 'PowerShell debugging is active.' };
     }
-    if (policy.deferWhileRunningCommands && activity === 'busy' || policy.requireKnownIdle && activity !== 'idle') {
+    if ((policy.deferWhileRunningCommands && activity === 'busy') || (policy.requireKnownIdle && activity !== 'idle')) {
       this.resetSeries();
       return { ...base, state: 'deferred', detail: activity === 'busy' ? 'A terminal command is active.' : 'Terminal activity is unknown; verified idle is required.' };
     }

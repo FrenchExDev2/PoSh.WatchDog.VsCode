@@ -24,7 +24,7 @@ function describeStatus(snapshot) {
   const label = stateLabels[snapshot.state] || snapshot.state;
   const mode = snapshot.mode === 'automatic' ? 'Editor restart: automatic; other pwsh: alerts only.' : 'All pwsh: alerts only.';
   let text;
-  if (snapshot.state === 'disabled' || snapshot.state === 'suspended' && !count) text = `$(pulse) pwsh · ${label}`;
+  if (snapshot.state === 'disabled' || (snapshot.state === 'suspended' && !count)) text = `$(pulse) pwsh · ${label}`;
   else if (!count) text = `$(pulse) pwsh · ${snapshot.state === 'waiting' ? complete ? 'No pwsh in this window' : 'Discovering pwsh' : label}`;
   else text = `$(pulse) pwsh ${count} · ${complete ? '' : '≥ '}${formatMemory(knownTotal)} total · ${label}`;
   const sorted = [...processes].sort((left, right) => right.privateBytes - left.privateBytes);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.5 — 2026-11-05
+
+- Correct the repository URL and align the installation example with the packaged version.
+- Keep Editor Services restart fail-closed using an immutable qualified-version allowlist. Explain detected and qualified versions, retained monitoring and the qualification requirement; retain the association error detail in JSON diagnostics.
+- Restrict live dashboard collection to off, two seconds or five seconds, including validation of webview messages. Each delay starts after completion and hidden dashboards remain paused.
+- Remove the unused JavaScript single-session collector. Mark the controller's injected legacy adapter as test-only; exclude the historical session script and journal from the VSIX.
+- Add a local PowerShell Watchdog output log for command, observation and notification failures, retaining error details. Correct the suspension range message and parenthesize mixed boolean expressions.
+- Add maintained ESLint tooling and a CI lint step. Update development-only Azure dependencies and override the affected vsce and ESLint minimatch dependencies to 11.0.1 to resolve the audited advisories without downgrading OIDC publishing support. Development lint requires Node 22.13+; runtime requirements are unchanged.
+- Validate 123 unit tests, 17 process-selection assertions and both offline Edge browser harnesses on Windows. Lint passes. No installed-extension or real restart qualification is claimed.
+
 ## 0.5.4 — 2026-11-04
 
 - Require a matching changelog update before every agent-created Git commit, using a concrete release version instead of an Unreleased heading.

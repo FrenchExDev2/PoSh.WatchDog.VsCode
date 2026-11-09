@@ -75,18 +75,18 @@ async function main() {
     await post(snapshot);
     await evaluate('document.getElementById("show-profiles").click();');
     checks.push('Gio axis covers zero, fractional and large memory values, rescales without profiles and aligns thresholds with ticks.');
-    assert.deepEqual(await evaluate('Array.from(document.getElementById("live-interval").options,o=>Number(o.value))'), [0, 250, 500, 1000, 2000, 5000]);
+    assert.deepEqual(await evaluate('Array.from(document.getElementById("live-interval").options,o=>Number(o.value))'), [0, 2000, 5000]);
     assert.equal(await evaluate('document.querySelector("#live-controls label[for=live-interval]").textContent'), 'Refresh interval');
     assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("off")'));
-    for (const milliseconds of [250, 500, 1000, 2000, 5000, 0]) {
+    for (const milliseconds of [2000, 5000, 0]) {
       await evaluate(`document.getElementById('live-interval').value='${milliseconds}';document.getElementById('live-interval').dispatchEvent(new Event('change'));`);
       assert.deepEqual(await evaluate('window.sent.at(-1)'), { action: 'liveInterval', milliseconds });
     }
-    await evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify({ type: 'snapshot', model: { ...dashboardModel(snapshot), liveIntervalMs: 500 } })}}))`);
-    assert.equal(await evaluate('document.getElementById("live-interval").value'), '500');
-    assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("500 ms")'));
+    await evaluate(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify({ type: 'snapshot', model: { ...dashboardModel(snapshot), liveIntervalMs: 2000 } })}}))`);
+    assert.equal(await evaluate('document.getElementById("live-interval").value'), '2000');
+    assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("2 s")'));
     assert.equal(await evaluate('typeof window.attacked'), 'undefined'); assert.equal(await evaluate('document.querySelectorAll("img[src=x]").length'), 0);
-    checks.push('Development/tests/build thresholds share the selected process chart; profile visibility, collection gaps, hostile text and all six live delays work.');
+    checks.push('Development/tests/build thresholds share the selected process chart; profile visibility, collection gaps, hostile text and all three live delays work.');
     await evaluate('document.getElementById("sort").value="tree";document.getElementById("sort").dispatchEvent(new Event("change"));');
     assert.ok(await evaluate('document.getElementById("inventory").textContent.includes("↳ 2")'));
     await evaluate('document.getElementById("kind").value="child";document.getElementById("kind").dispatchEvent(new Event("change"));');

@@ -1,0 +1,748 @@
+TAP version 13
+# Subtest: VSIX build installs the newly verified version in the selected profile, preserving spaces and Unicode
+ok 1 - VSIX build installs the newly verified version in the selected profile, preserving spaces and Unicode
+  ---
+  duration_ms: 2912.5181
+  type: 'test'
+  ...
+# Subtest: VSIX delivery rejects PackagingFailure and stops before subsequent steps
+ok 2 - VSIX delivery rejects PackagingFailure and stops before subsequent steps
+  ---
+  duration_ms: 1481.5708
+  type: 'test'
+  ...
+# Subtest: VSIX delivery rejects MissingPackage and stops before subsequent steps
+ok 3 - VSIX delivery rejects MissingPackage and stops before subsequent steps
+  ---
+  duration_ms: 1302.5513
+  type: 'test'
+  ...
+# Subtest: VSIX delivery rejects WrongVersion and stops before subsequent steps
+ok 4 - VSIX delivery rejects WrongVersion and stops before subsequent steps
+  ---
+  duration_ms: 1195.6791
+  type: 'test'
+  ...
+# Subtest: VSIX delivery rejects InstallationFailure and stops before subsequent steps
+ok 5 - VSIX delivery rejects InstallationFailure and stops before subsequent steps
+  ---
+  duration_ms: 1557.9665
+  type: 'test'
+  ...
+# Subtest: VSIX delivery rejects UnconfirmedVersion and stops before subsequent steps
+ok 6 - VSIX delivery rejects UnconfirmedVersion and stops before subsequent steps
+  ---
+  duration_ms: 1717.192
+  type: 'test'
+  ...
+# Subtest: VSIX preview neither invokes native tools nor overwrites an existing archive
+ok 7 - VSIX preview neither invokes native tools nor overwrites an existing archive
+  ---
+  duration_ms: 1175.1636
+  type: 'test'
+  ...
+# Subtest: workspace and language overrides cannot increase automatic authority
+ok 8 - workspace and language overrides cannot increase automatic authority
+  ---
+  duration_ms: 10.9944
+  type: 'test'
+  ...
+# Subtest: explicit invalid values are validated rather than silently replaced with defaults
+ok 9 - explicit invalid values are validated rather than silently replaced with defaults
+  ---
+  duration_ms: 1.5047
+  type: 'test'
+  ...
+# Subtest: every declared setting has machine scope and agrees with the product defaults
+ok 10 - every declared setting has machine scope and agrees with the product defaults
+  ---
+  duration_ms: 0.8926
+  type: 'test'
+  ...
+# Subtest: AC-06/10: command return requires measured replacement before success
+ok 11 - AC-06/10: command return requires measured replacement before success
+  ---
+  duration_ms: 13.3305
+  type: 'test'
+  ...
+# Subtest: AC-10: normal command return with unchanged identity expires and suspends
+ok 12 - AC-10: normal command return with unchanged identity expires and suspends
+  ---
+  duration_ms: 54.7522
+  type: 'test'
+  ...
+# Subtest: AC-12: a hung restart command is bounded and cannot overlap after resume
+ok 13 - AC-12: a hung restart command is bounded and cannot overlap after resume
+  ---
+  duration_ms: 85.5881
+  type: 'test'
+  ...
+# Subtest: missing or rejected restart command suspends, without forced termination
+ok 14 - missing or rejected restart command suspends, without forced termination
+  ---
+  duration_ms: 1.7628
+  type: 'test'
+  ...
+# Subtest: AC-07: failed collection clears current value and keeps the previous valid sample separate
+ok 15 - AC-07: failed collection clears current value and keeps the previous valid sample separate
+  ---
+  duration_ms: 72.7148
+  type: 'test'
+  ...
+# Subtest: AC-15: concurrent ticks never overlap collectors
+ok 16 - AC-15: concurrent ticks never overlap collectors
+  ---
+  duration_ms: 36.5127
+  type: 'test'
+  ...
+# Subtest: policy changes during collection discard stale evidence and prevent dispatch
+ok 17 - policy changes during collection discard stale evidence and prevent dispatch
+  ---
+  duration_ms: 2.1912
+  type: 'test'
+  ...
+# Subtest: final sample below threshold prevents restart
+ok 18 - final sample below threshold prevents restart
+  ---
+  duration_ms: 2.1999
+  type: 'test'
+  ...
+# Subtest: unknown or remote environments never request commands
+ok 19 - unknown or remote environments never request commands
+  ---
+  duration_ms: 1.945
+  type: 'test'
+  ...
+# Subtest: deadline and cancellation also bound non-resolving session association
+ok 20 - deadline and cancellation also bound non-resolving session association
+  ---
+  duration_ms: 52.6702
+  type: 'test'
+  ...
+# Subtest: restart is cancelled when disable occurs during quota persistence
+ok 21 - restart is cancelled when disable occurs during quota persistence
+  ---
+  duration_ms: 2.3621
+  type: 'test'
+  ...
+# Subtest: restart is cancelled when notifyOnly occurs during quota persistence
+ok 22 - restart is cancelled when notifyOnly occurs during quota persistence
+  ---
+  duration_ms: 0.7925
+  type: 'test'
+  ...
+# Subtest: restart is cancelled when suspend occurs during quota persistence
+ok 23 - restart is cancelled when suspend occurs during quota persistence
+  ---
+  duration_ms: 0.8459
+  type: 'test'
+  ...
+# Subtest: restart is cancelled when debug occurs during quota persistence
+ok 24 - restart is cancelled when debug occurs during quota persistence
+  ---
+  duration_ms: 0.696
+  type: 'test'
+  ...
+# Subtest: restart is cancelled when dispose occurs during quota persistence
+ok 25 - restart is cancelled when dispose occurs during quota persistence
+  ---
+  duration_ms: 1.5848
+  type: 'test'
+  ...
+# Subtest: synchronous restart failure clears the command lock and suspends automatic actions
+ok 26 - synchronous restart failure clears the command lock and suspends automatic actions
+  ---
+  duration_ms: 3.1369
+  type: 'test'
+  ...
+# Subtest: successful slow collections can satisfy persistence with a short sampling interval
+ok 27 - successful slow collections can satisfy persistence with a short sampling interval
+  ---
+  duration_ms: 10.0617
+  type: 'test'
+  ...
+# Subtest: suspend, resume and configuration actions are retained without duplicate paused samples
+ok 28 - suspend, resume and configuration actions are retained without duplicate paused samples
+  ---
+  duration_ms: 1.1405
+  type: 'test'
+  ...
+# Subtest: an initially disabled controller records its state once without collecting
+ok 29 - an initially disabled controller records its state once without collecting
+  ---
+  duration_ms: 0.5962
+  type: 'test'
+  ...
+# Subtest: a rejected configuration event write is exposed without an unhandled rejection
+ok 30 - a rejected configuration event write is exposed without an unhandled rejection
+  ---
+  duration_ms: 8.861
+  type: 'test'
+  ...
+# Subtest: all three profile thresholds reflect custom settings and absolute per-kind overrides
+ok 31 - all three profile thresholds reflect custom settings and absolute per-kind overrides
+  ---
+  duration_ms: 3.9494
+  type: 'test'
+  ...
+# Subtest: live monitoring accepts exactly the requested delays, shares views and stops at zero
+ok 32 - live monitoring accepts exactly the requested delays, shares views and stops at zero
+  ---
+  duration_ms: 9.9571
+  type: 'test'
+  ...
+# Subtest: live collection waits for completion, pauses when all views hide and cleans up on disposal
+ok 33 - live collection waits for completion, pauses when all views hide and cleans up on disposal
+  ---
+  duration_ms: 0.9314
+  type: 'test'
+  ...
+# Subtest: failed live collection reports an outcome and continues; disabling during a collection prevents rescheduling
+ok 34 - failed live collection reports an outcome and continues; disabling during a collection prevents rescheduling
+  ---
+  duration_ms: 1.247
+  type: 'test'
+  ...
+# Subtest: retained disk and memory history are merged, ordered and deduplicated
+ok 35 - retained disk and memory history are merged, ordered and deduplicated
+  ---
+  duration_ms: 6.8477
+  type: 'test'
+  ...
+# Subtest: workspace history identifies sessions and retains each process effective thresholds
+ok 36 - workspace history identifies sessions and retains each process effective thresholds
+  ---
+  duration_ms: 0.7328
+  type: 'test'
+  ...
+# Subtest: PID reuse produces independent identities and peak rankings
+ok 37 - PID reuse produces independent identities and peak rankings
+  ---
+  duration_ms: 0.817
+  type: 'test'
+  ...
+# Subtest: legacy Editor Services-only history stays explicitly incomplete
+ok 38 - legacy Editor Services-only history stays explicitly incomplete
+  ---
+  duration_ms: 0.5218
+  type: 'test'
+  ...
+# Subtest: top-20 omission and a separate editor sample preserve evidence without inventing a total
+ok 39 - top-20 omission and a separate editor sample preserve evidence without inventing a total
+  ---
+  duration_ms: 0.7203
+  type: 'test'
+  ...
+# Subtest: unknown or invalid measurements remain null and malformed timestamps are counted
+ok 40 - unknown or invalid measurements remain null and malformed timestamps are counted
+  ---
+  duration_ms: 0.6032
+  type: 'test'
+  ...
+# Subtest: untrusted text cannot escape the embedded JSON or become executable markup
+ok 41 - untrusted text cannot escape the embedded JSON or become executable markup
+  ---
+  duration_ms: 36.4417
+  type: 'test'
+  ...
+# Subtest: only recorded transitions and restart results become timeline events
+ok 42 - only recorded transitions and restart results become timeline events
+  ---
+  duration_ms: 1.7112
+  type: 'test'
+  ...
+# Subtest: per-process warnings are recorded even when the editor state is unchanged
+ok 43 - per-process warnings are recorded even when the editor state is unchanged
+  ---
+  duration_ms: 1.4265
+  type: 'test'
+  ...
+# Subtest: missing samples, long collection gaps and PID reuse cannot be connected by a chart line
+ok 44 - missing samples, long collection gaps and PID reuse cannot be connected by a chart line
+  ---
+  duration_ms: 1.6704
+  type: 'test'
+  ...
+# Subtest: display-only reduction preserves isolated peaks, troughs and endpoint observations
+ok 45 - display-only reduction preserves isolated peaks, troughs and endpoint observations
+  ---
+  duration_ms: 4.1985
+  type: 'test'
+  ...
+# Subtest: an empty diagnostic still produces a complete offline HTML document
+ok 46 - an empty diagnostic still produces a complete offline HTML document
+  ---
+  duration_ms: 0.8193
+  type: 'test'
+  ...
+# Subtest: automatic exports are unique, use workspace storage and open only after a complete write
+ok 47 - automatic exports are unique, use workspace storage and open only after a complete write
+  ---
+  duration_ms: 100.2521
+  type: 'test'
+  ...
+# Subtest: failed tab opening keeps the HTML and exposes its path; global storage works without a workspace
+ok 48 - failed tab opening keeps the HTML and exposes its path; global storage works without a workspace
+  ---
+  duration_ms: 11.9479
+  type: 'test'
+  ...
+# Subtest: command failures retain their original details in the output channel
+ok 49 - command failures retain their original details in the output channel
+  ---
+  duration_ms: 72.7798
+  type: 'test'
+  ...
+# Subtest: suspension validation explains the exclusive lower and inclusive upper bounds
+ok 50 - suspension validation explains the exclusive lower and inclusive upper bounds
+  ---
+  duration_ms: 4.0911
+  type: 'test'
+  ...
+# Subtest: unchanged observations do not reassign the native tooltip or status, and no age timer runs
+ok 51 - unchanged observations do not reassign the native tooltip or status, and no age timer runs
+  ---
+  duration_ms: 57.393
+  type: 'test'
+  ...
+# Subtest: a changed measurement still updates the hover and status through the collection callback
+ok 52 - a changed measurement still updates the hover and status through the collection callback
+  ---
+  duration_ms: 5.0789
+  type: 'test'
+  ...
+# Subtest: enable clears persisted suspension and collects immediately when enabled=true
+ok 53 - enable clears persisted suspension and collects immediately when enabled=true
+  ---
+  duration_ms: 5.2587
+  type: 'test'
+  ...
+# Subtest: enable clears persisted suspension and collects immediately when enabled=false
+ok 54 - enable clears persisted suspension and collects immediately when enabled=false
+  ---
+  duration_ms: 7.9402
+  type: 'test'
+  ...
+# Subtest: resume clears persisted suspension and collects immediately when enabled=true
+ok 55 - resume clears persisted suspension and collects immediately when enabled=true
+  ---
+  duration_ms: 4.3596
+  type: 'test'
+  ...
+# Subtest: resume clears persisted suspension and collects immediately when enabled=false
+ok 56 - resume clears persisted suspension and collects immediately when enabled=false
+  ---
+  duration_ms: 23.4905
+  type: 'test'
+  ...
+# Subtest: countdown expires only after fresh identity, threshold and command checks
+ok 57 - countdown expires only after fresh identity, threshold and command checks
+  ---
+  duration_ms: 10.8515
+  type: 'test'
+  ...
+# Subtest: cancel blocks the current episode until memory falls below the threshold
+ok 58 - cancel blocks the current episode until memory falls below the threshold
+  ---
+  duration_ms: 2.8419
+  type: 'test'
+  ...
+# Subtest: episode cancellation survives profile changes and reload while manual restart supersedes its countdown
+ok 59 - episode cancellation survives profile changes and reload while manual restart supersedes its countdown
+  ---
+  duration_ms: 3.8453
+  type: 'test'
+  ...
+# Subtest: postponement persists without suspending measurement, and restart now rechecks memory
+ok 60 - postponement persists without suspending measurement, and restart now rechecks memory
+  ---
+  duration_ms: 2.0465
+  type: 'test'
+  ...
+# Subtest: replacement PID, command activity and debugger changes invalidate a countdown
+ok 61 - replacement PID, command activity and debugger changes invalidate a countdown
+  ---
+  duration_ms: 2.9935
+  type: 'test'
+  ...
+# Subtest: cancellation during the final measurement prevents command dispatch
+ok 62 - cancellation during the final measurement prevents command dispatch
+  ---
+  duration_ms: 1.4724
+  type: 'test'
+  ...
+# Subtest: busy activity during durable quota persistence cancels dispatch without consuming quota
+ok 63 - busy activity during durable quota persistence cancels dispatch without consuming quota
+  ---
+  duration_ms: 2.0397
+  type: 'test'
+  ...
+# Subtest: strict idle requirement blocks unknown activity and health reports collection failures and recovery
+ok 64 - strict idle requirement blocks unknown activity and health reports collection failures and recovery
+  ---
+  duration_ms: 1.3743
+  type: 'test'
+  ...
+# Subtest: profiles and absolute process overrides use separate effective thresholds once
+ok 65 - profiles and absolute process overrides use separate effective thresholds once
+  ---
+  duration_ms: 0.6531
+  type: 'test'
+  ...
+# Subtest: shell signals remain unknown until observed, track overlapping commands and never inspect their contents
+ok 66 - shell signals remain unknown until observed, track overlapping commands and never inspect their contents
+  ---
+  duration_ms: 0.8907
+  type: 'test'
+  ...
+# Subtest: growth alert requires a full sustained window, deduplicates warnings, resets gaps and PID reuse; CPU is a delta
+ok 67 - growth alert requires a full sustained window, deduplicates warnings, resets gaps and PID reuse; CPU is a delta
+  ---
+  duration_ms: 0.9942
+  type: 'test'
+  ...
+# Subtest: fast sampling keeps full trend-window coverage while bounding stored observations
+ok 68 - fast sampling keeps full trend-window coverage while bounding stored observations
+  ---
+  duration_ms: 64.3849
+  type: 'test'
+  ...
+# Subtest: persistent history reloads, preserves activation identity, bounds memory and skips corrupt or expired entries
+ok 69 - persistent history reloads, preserves activation identity, bounds memory and skips corrupt or expired entries
+  ---
+  duration_ms: 1441.9225
+  type: 'test'
+  ...
+# Subtest: retention removes only owned files, enforces byte budget and recovers a deleted active segment
+ok 70 - retention removes only owned files, enforces byte budget and recovers a deleted active segment
+  ---
+  duration_ms: 41.3594
+  type: 'test'
+  ...
+# Subtest: HTML report cleanup applies age and combined size limits and rejects oversize reservations
+ok 71 - HTML report cleanup applies age and combined size limits and rejects oversize reservations
+  ---
+  duration_ms: 12.0533
+  type: 'test'
+  ...
+# Subtest: dashboard excludes arbitrary properties and webview accepts only bounded allowlisted actions
+ok 72 - dashboard excludes arbitrary properties and webview accepts only bounded allowlisted actions
+  ---
+  duration_ms: 3.2033
+  type: 'test'
+  ...
+# Subtest: all ordinary pwsh instances are monitored with independent thresholds and alerts, without restart commands
+ok 73 - all ordinary pwsh instances are monitored with independent thresholds and alerts, without restart commands
+  ---
+  duration_ms: 11.0612
+  type: 'test'
+  ...
+# Subtest: a total above the restart threshold does not merge separate process streaks
+ok 74 - a total above the restart threshold does not merge separate process streaks
+  ---
+  duration_ms: 3.1402
+  type: 'test'
+  ...
+# Subtest: exited instances are removed and a reused PID starts a fresh streak
+ok 75 - exited instances are removed and a reused PID starts a fresh streak
+  ---
+  duration_ms: 2.0368
+  type: 'test'
+  ...
+# Subtest: policy edits, suspension and disable clear ordinary process evidence
+ok 76 - policy edits, suspension and disable clear ordinary process evidence
+  ---
+  duration_ms: 1.9258
+  type: 'test'
+  ...
+# Subtest: AC-15: history and all rotated files stay within their budgets
+ok 77 - AC-15: history and all rotated files stay within their budgets
+  ---
+  duration_ms: 1735.8612
+  type: 'test'
+  ...
+# Subtest: retained reads are ordered and serialized with writes and rotation
+ok 78 - retained reads are ordered and serialized with writes and rotation
+  ---
+  duration_ms: 85.727
+  type: 'test'
+  ...
+# Subtest: missing journals, malformed lines and unreadable files are explicit and do not poison later appends
+ok 79 - missing journals, malformed lines and unreadable files are explicit and do not poison later appends
+  ---
+  duration_ms: 9.2914
+  type: 'test'
+  ...
+# Subtest: a file exceeding the journal budget is never read without a byte cap
+ok 80 - a file exceeding the journal budget is never read without a byte cap
+  ---
+  duration_ms: 6.3669
+  type: 'test'
+  ...
+# Subtest: Windows process selector enforces window, ancestry, lifetime and editor boundaries
+ok 81 - Windows process selector enforces window, ancestry, lifetime and editor boundaries
+  ---
+  duration_ms: 1694.3598
+  type: 'test'
+  ...
+# Subtest: ordinary terminals are measured without activating Microsoft PowerShell
+ok 82 - ordinary terminals are measured without activating Microsoft PowerShell
+  ---
+  duration_ms: 4.6855
+  type: 'test'
+  ...
+# Subtest: unqualified Editor Services does not block ordinary process measurements or authorize restart
+ok 83 - unqualified Editor Services does not block ordinary process measurements or authorize restart
+  ---
+  duration_ms: 1.0487
+  type: 'test'
+  ...
+# Subtest: only independently verified Editor Services is exposed as the restart target
+ok 84 - only independently verified Editor Services is exposed as the restart target
+  ---
+  duration_ms: 1.0534
+  type: 'test'
+  ...
+# Subtest: Stable and Insiders retain restart support using their explicit host identity and executable
+ok 85 - Stable and Insiders retain restart support using their explicit host identity and executable
+  ---
+  duration_ms: 1.3888
+  type: 'test'
+  ...
+# Subtest: an Editor Services terminal removed during collection cannot authorize restart
+ok 86 - an Editor Services terminal removed during collection cannot authorize restart
+  ---
+  duration_ms: 2.3614
+  type: 'test'
+  ...
+# Subtest: unresolved terminal PIDs produce explicit partial inventory without blocking resolved terminals
+ok 87 - unresolved terminal PIDs produce explicit partial inventory without blocking resolved terminals
+  ---
+  duration_ms: 29.0172
+  type: 'test'
+  ...
+# Subtest: unverified ownership and unavailable processes keep known measurements explicitly partial
+ok 88 - unverified ownership and unavailable processes keep known measurements explicitly partial
+  ---
+  duration_ms: 1.0272
+  type: 'test'
+  ...
+# Subtest: a terminal closed while its PID was resolving cannot become an ownership root
+ok 89 - a terminal closed while its PID was resolving cannot become an ownership root
+  ---
+  duration_ms: 0.8733
+  type: 'test'
+  ...
+# Subtest: invalid or unknown memory is rejected rather than interpreted as zero
+ok 90 - invalid or unknown memory is rejected rather than interpreted as zero
+  ---
+  duration_ms: 0.6108
+  type: 'test'
+  ...
+# Subtest: terminal navigation uses normalized creation identity and refuses closed or stale terminals
+ok 91 - terminal navigation uses normalized creation identity and refuses closed or stale terminals
+  ---
+  duration_ms: 0.7851
+  type: 'test'
+  ...
+# Subtest: AC-04: one warning per threshold episode, resident memory does not hide private allocation
+ok 92 - AC-04: one warning per threshold episode, resident memory does not hide private allocation
+  ---
+  duration_ms: 5.059
+  type: 'test'
+  ...
+# Subtest: AC-05/06: three inclusive consecutive high samples authorize one request
+ok 93 - AC-05/06: three inclusive consecutive high samples authorize one request
+  ---
+  duration_ms: 0.6776
+  type: 'test'
+  ...
+# Subtest: AC-07: unknown sample and long gaps break continuity
+ok 94 - AC-07: unknown sample and long gaps break continuity
+  ---
+  duration_ms: 19.9724
+  type: 'test'
+  ...
+# Subtest: continuity includes the collection deadline as well as the delay between collections
+ok 95 - continuity includes the collection deadline as well as the delay between collections
+  ---
+  duration_ms: 0.6339
+  type: 'test'
+  ...
+# Subtest: gaps beyond the collection-aware tolerance still reset the series
+ok 96 - gaps beyond the collection-aware tolerance still reset the series
+  ---
+  duration_ms: 26.058
+  type: 'test'
+  ...
+# Subtest: explicit samples cannot accelerate the configured persistence interval
+ok 97 - explicit samples cannot accelerate the configured persistence interval
+  ---
+  duration_ms: 2.0932
+  type: 'test'
+  ...
+# Subtest: AC-08: debug sessions defer restart and end requires a fresh series
+ok 98 - AC-08: debug sessions defer restart and end requires a fresh series
+  ---
+  duration_ms: 0.7783
+  type: 'test'
+  ...
+# Subtest: AC-09: PID reuse with a new creation date resets counters
+ok 99 - AC-09: PID reuse with a new creation date resets counters
+  ---
+  duration_ms: 0.3828
+  type: 'test'
+  ...
+# Subtest: AC-11: rolling quota survives reload, expires by time, and suspension needs explicit resume
+ok 100 - AC-11: rolling quota survives reload, expires by time, and suspension needs explicit resume
+  ---
+  duration_ms: 0.9412
+  type: 'test'
+  ...
+# Subtest: automatic restarts without sustained improvement suspend after cooldown and persistence
+ok 101 - automatic restarts without sustained improvement suspend after cooldown and persistence
+  ---
+  duration_ms: 0.7526
+  type: 'test'
+  ...
+# Subtest: explicit resume acknowledges failed improvement and requires a fresh high-memory series
+ok 102 - explicit resume acknowledges failed improvement and requires a fresh high-memory series
+  ---
+  duration_ms: 41.7959
+  type: 'test'
+  ...
+# Subtest: resume preserves cooldown and the rolling-hour restart quota
+ok 103 - resume preserves cooldown and the rolling-hour restart quota
+  ---
+  duration_ms: 0.4737
+  type: 'test'
+  ...
+# Subtest: AC-13: disabled and notifyOnly never authorize automatic restart
+ok 104 - AC-13: disabled and notifyOnly never authorize automatic restart
+  ---
+  duration_ms: 0.4256
+  type: 'test'
+  ...
+# Subtest: invalid policy, timer overflow, non-integers, NaN and invalid types fail closed
+ok 105 - invalid policy, timer overflow, non-integers, NaN and invalid types fail closed
+  ---
+  duration_ms: 0.7044
+  type: 'test'
+  ...
+# Subtest: policy edits reset the consecutive series
+ok 106 - policy edits reset the consecutive series
+  ---
+  duration_ms: 0.2866
+  type: 'test'
+  ...
+# Subtest: suspension expiry requires fresh samples and restart failures persist across reload
+ok 107 - suspension expiry requires fresh samples and restart failures persist across reload
+  ---
+  duration_ms: 0.379
+  type: 'test'
+  ...
+# Subtest: memory formatting selects binary units at their exact boundaries
+ok 108 - memory formatting selects binary units at their exact boundaries
+  ---
+  duration_ms: 2.8568
+  type: 'test'
+  ...
+# Subtest: status and hover use appropriate units for total and individual memory
+ok 109 - status and hover use appropriate units for total and individual memory
+  ---
+  duration_ms: 13.7261
+  type: 'test'
+  ...
+# Subtest: no processes has a clear waiting label without an unknown memory number
+ok 110 - no processes has a clear waiting label without an unknown memory number
+  ---
+  duration_ms: 0.665
+  type: 'test'
+  ...
+# Subtest: multiple processes show count and committed total with per-process details
+ok 111 - multiple processes show count and committed total with per-process details
+  ---
+  duration_ms: 0.9971
+  type: 'test'
+  ...
+# Subtest: partial inventory never presents an exact total
+ok 112 - partial inventory never presents an exact total
+  ---
+  duration_ms: 1.1059
+  type: 'test'
+  ...
+# Subtest: disable and collection errors are human-readable states
+ok 113 - disable and collection errors are human-readable states
+  ---
+  duration_ms: 0.3787
+  type: 'test'
+  ...
+# Subtest: hover timestamps stay stable as time passes and change only with new collection evidence
+ok 114 - hover timestamps stay stable as time passes and change only with new collection evidence
+  ---
+  duration_ms: 2.065
+  type: 'test'
+  ...
+# Subtest: visual diagnostics opens the offline interactive report in an editor webview
+ok 115 - visual diagnostics opens the offline interactive report in an editor webview
+  ---
+  duration_ms: 14.687
+  type: 'test'
+  ...
+# Subtest: generating diagnostics again refreshes and reveals the existing tab
+ok 116 - generating diagnostics again refreshes and reveals the existing tab
+  ---
+  duration_ms: 0.8978
+  type: 'test'
+  ...
+# Subtest: closing the report allows a later command to create a new tab
+ok 117 - closing the report allows a later command to create a new tab
+  ---
+  duration_ms: 0.4493
+  type: 'test'
+  ...
+# Subtest: extension disposal closes the report and is safe without an open tab
+ok 118 - extension disposal closes the report and is safe without an open tab
+  ---
+  duration_ms: 0.2917
+  type: 'test'
+  ...
+# Subtest: AC-01/02: current-window launch artifacts select one terminal and exclude the other window
+ok 119 - AC-01/02: current-window launch artifacts select one terminal and exclude the other window
+  ---
+  duration_ms: 4.2639
+  type: 'test'
+  ...
+# Subtest: AC-03: duplicate matching terminals fail closed
+ok 120 - AC-03: duplicate matching terminals fail closed
+  ---
+  duration_ms: 3.2345
+  type: 'test'
+  ...
+# Subtest: ordinary PowerShell, debug-only and substituted module paths are excluded
+ok 121 - ordinary PowerShell, debug-only and substituted module paths are excluded
+  ---
+  duration_ms: 0.5121
+  type: 'test'
+  ...
+# Subtest: waiting does not activate PowerShell or start a session
+ok 122 - waiting does not activate PowerShell or start a session
+  ---
+  duration_ms: 0.3718
+  type: 'test'
+  ...
+# Subtest: unknown extension versions and unavailable PIDs are explicit failures
+ok 123 - unknown extension versions and unavailable PIDs are explicit failures
+  ---
+  duration_ms: 1.0558
+  type: 'test'
+  ...
+1..123
+# tests 123
+# suites 0
+# pass 123
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11585.9716

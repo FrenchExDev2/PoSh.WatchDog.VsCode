@@ -1,0 +1,1 @@
+{"SchemaVersion":2,"Summary":"Native command processed.","Outcome":"Success","Data":{"Errors":"","Output":[" DONE  Packaged: dist/powershell-watchdog-0.5.5.vsix (27 files, 91.9 KB)"]},"Execution":{"ExitCode":0,"ElapsedMs":7344},"Context":{"Namespace":"FrenchExDev","Name":"FrenchExDev","Selection":"ProjectRoot"},"RecordId":"e947b5eced95"}

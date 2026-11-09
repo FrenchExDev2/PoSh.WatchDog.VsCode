@@ -17,6 +17,8 @@ async function fixture(enabled = true, delayedConfiguration = false) {
   let measuredAt = '2026-11-04T04:00:00Z';
   let intervals = 0;
   const statusWrites = { text: 0, tooltip: 0, backgroundColor: 0 };
+  const errors = [];
+  let input;
   const status = new Proxy({ show() {}, dispose() {} }, { set(target, key, value) {
     if (Object.hasOwn(statusWrites, key)) statusWrites[key]++;
     target[key] = value; return true;
@@ -33,7 +35,10 @@ async function fixture(enabled = true, delayedConfiguration = false) {
     StatusBarAlignment: { Right: 1 }, ConfigurationTarget: { Global: 1 }, UIKind: { Desktop: 1 },
     env: { uiKind: 1 }, debug: { onDidStartDebugSession: disposable, onDidTerminateDebugSession: disposable },
     window: { createStatusBarItem: () => status,
-      showErrorMessage: (message) => { throw new Error(message); } },
+      createOutputChannel: () => ({ error: (message) => errors.push(message), dispose() {} }),
+      showInputBox: async (options) => { input = options; },
+      showQuickPick: async () => { throw new Error('fixture action failure'); },
+      showErrorMessage: () => Promise.resolve() },
     workspace: { getConfiguration: () => configuration,
       onDidChangeConfiguration: (callback) => { configurationChanged = callback; return disposable(); } },
     commands: { registerCommand: (name, callback) => { commands.set(name, callback); return disposable(); } },
@@ -68,10 +73,25 @@ async function fixture(enabled = true, delayedConfiguration = false) {
     setInterval: () => { intervals++; return 1; }, clearInterval() {} };
   vm.runInNewContext(source, sandbox, { filename: 'extension.js' });
   const api = await sandbox.module.exports.activate(context);
-  return { api, journal, commands, statusWrites, intervals: () => intervals,
+  return { api, journal, commands, statusWrites, errors, input: () => input, intervals: () => intervals,
     setMeasurement: (bytes, at) => { memoryBytes = bytes; measuredAt = at; }, stored: () => stored, collections: () => collections,
     dispose: () => context.subscriptions.forEach((item) => item.dispose()) };
 }
+
+test('command failures retain their original details in the output channel', async (t) => {
+  const f = await fixture(); t.after(f.dispose);
+  await f.commands.get('powershellWatchdog.changeMode')();
+  assert.equal(f.errors.length, 1);
+  assert.match(f.errors[0], /Command changeMode:.*fixture action failure/s);
+});
+
+test('suspension validation explains the exclusive lower and inclusive upper bounds', async (t) => {
+  const f = await fixture(); t.after(f.dispose);
+  await f.commands.get('powershellWatchdog.suspend')();
+  const validate = f.input().validateInput;
+  for (const value of ['', '0', '-1', '10081', 'NaN']) assert.match(validate(value), /greater than 0 and at most 10080/);
+  for (const value of ['0.5', '1', '10080']) assert.equal(validate(value), null);
+});
 
 test('unchanged observations do not reassign the native tooltip or status, and no age timer runs', async (t) => {
   const f = await fixture();

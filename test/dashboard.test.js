@@ -45,9 +45,9 @@ test('live monitoring accepts exactly the requested delays, shares views and sto
   const calls = []; const f = fixture(async (action) => calls.push(action)); t.after(() => f.dashboard.dispose());
   const first = f.attach(); const second = f.attach();
   assert.equal(f.pending.size, 0);
-  for (const milliseconds of [-1, 1, 100, 15000, '250', null, NaN]) await first.receive({ action: 'liveInterval', milliseconds });
+  for (const milliseconds of [-1, 1, 100, 250, 500, 1000, 15000, '2000', null, NaN]) await first.receive({ action: 'liveInterval', milliseconds });
   assert.equal(f.pending.size, 0);
-  for (const milliseconds of [250, 500, 1000, 2000, 5000]) {
+  for (const milliseconds of [2000, 5000]) {
     await first.receive({ action: 'liveInterval', milliseconds });
     assert.equal(f.pending.size, 1);
     assert.equal(f.pending.values().next().value.milliseconds, milliseconds);
@@ -64,10 +64,10 @@ test('live collection waits for completion, pauses when all views hide and clean
   const f = fixture(() => { calls++; return new Promise((resolve) => { finish = resolve; }); });
   const first = f.attach(); const second = f.attach();
   try {
-    await first.receive({ action: 'liveInterval', milliseconds: 250 });
+    await first.receive({ action: 'liveInterval', milliseconds: 2000 });
     const collecting = f.fire(); assert.equal(calls, 1); assert.equal(f.pending.size, 0);
-    await second.receive({ action: 'liveInterval', milliseconds: 500 }); assert.equal(f.pending.size, 0);
-    finish(); await collecting; assert.equal(f.pending.values().next().value.milliseconds, 500);
+    await second.receive({ action: 'liveInterval', milliseconds: 5000 }); assert.equal(f.pending.size, 0);
+    finish(); await collecting; assert.equal(f.pending.values().next().value.milliseconds, 5000);
     first.visible(false); assert.equal(f.pending.size, 1);
     second.visible(false); assert.equal(f.pending.size, 0);
     first.visible(true); assert.equal(f.pending.size, 1);
@@ -81,7 +81,7 @@ test('failed live collection reports an outcome and continues; disabling during 
   let finish; let fail = true;
   const f = fixture(async () => { if (fail) throw new Error('fixture'); await new Promise((resolve) => { finish = resolve; }); });
   t.after(() => f.dashboard.dispose()); const view = f.attach();
-  await view.receive({ action: 'liveInterval', milliseconds: 1000 }); await f.fire();
+  await view.receive({ action: 'liveInterval', milliseconds: 2000 }); await f.fire();
   assert.equal(f.errors.length, 1); assert.equal(f.pending.size, 1);
   fail = false; const collecting = f.fire();
   await view.receive({ action: 'liveInterval', milliseconds: 0 }); finish(); await collecting;

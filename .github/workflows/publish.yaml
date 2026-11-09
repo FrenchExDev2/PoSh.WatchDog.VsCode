@@ -65,6 +65,11 @@ jobs:
           # Objective: Install the tools locked for this commit without lifecycle scripts.
           npm ci --ignore-scripts
 
+      - name: Lint JavaScript
+        run: |
+          # Objective: Reject JavaScript errors and ambiguous boolean expressions before packaging.
+          node node_modules/eslint/bin/eslint.js src test eslint.config.js
+
       - name: Run unit tests
         run: |
           # Objective: Check policy and ownership behavior before packaging the release.

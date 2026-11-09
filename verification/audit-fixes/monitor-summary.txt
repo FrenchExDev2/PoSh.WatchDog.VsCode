@@ -1,0 +1,11 @@
+Projet : PoSh.WatchDog.VsCode | Tâche : audit checks
+C:\code\FrenchExDev\FrenchExDev_i2
+C:\code\FrenchExDev\FrenchExDev_i2\VsCode\FrenchExDev\PoSh.WatchDog.VsCode
+┌───────────┬─────────┬───────────┬─────────┬────────┬──────┬──────┐
+│ Check     | Platform| State     | Duration| Runner | Pass | Fail │
+├───────────┼─────────┼───────────┼─────────┼────────┼──────┼──────┤
+│ Unit      | Windows | Success   |     15s |  20940 |  123 |    0 │
+│ Selection | Windows | Success   |      2s |  20940 |    - |    - │
+│ Dashboard | Windows | Success   |      3s |  20940 |    - |    - │
+│ Report    | Windows | Success   |      4s |  20940 |    - |    - │
+└───────────┴─────────┴───────────┴─────────┴────────┴──────┴──────┘

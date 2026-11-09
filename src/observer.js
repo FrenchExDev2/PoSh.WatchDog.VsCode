@@ -72,7 +72,10 @@ class WindowProcessObserver {
     let editor;
     let editorIssue = null;
     try { editor = await withDeadline(() => this.resolveEditor(this.vscode), Math.min(300, milliseconds / 4), signal); }
-    catch (error) { editorIssue = ['unsupported', 'ambiguous'].includes(error.code) ? error.code : 'unavailable'; }
+    catch (error) {
+      editorIssue = ['unsupported', 'ambiguous'].includes(error.code) ? error.code : 'unavailable';
+      editor = { state: editorIssue, detail: error.message };
+    }
     const active = roots.filter((entry) => entry && this.vscode.window.terminals.includes(entry.terminal) && !entry.terminal.exitStatus);
     const remaining = milliseconds - (Date.now() - start);
     if (remaining <= 0) throw new WatchdogError('timeout', 'Process collection deadline exceeded.');
@@ -103,7 +106,7 @@ class WindowProcessObserver {
     return { target: editorSample ? editor : { state: 'waiting', detail: 'No verified Editor Services restart target in this window.' },
       sample: editorSample || null, inventory: { processes, errors: result.errors, limited: result.limited,
         complete: !result.limited && result.errors.length === 0 && unresolvedTerminals === 0,
-        unresolvedTerminals, editorIssue, measuredAt: new Date().toISOString(), scope: 'window' } };
+        unresolvedTerminals, editorIssue, editorDetail: editor?.detail || null, measuredAt: new Date().toISOString(), scope: 'window' } };
   }
 
   showTerminal(identity) {

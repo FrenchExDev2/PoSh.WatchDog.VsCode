@@ -1,3 +1,16 @@
+# Qualification — 0.5.5 — audit corrections
+
+Date: **5 November 2026**. Manifest, lockfile and changelog prepare version 0.5.5. No tag or publication is created by this validation.
+
+**123 unit tests pass on Windows, with zero failures, cancellations or skips**, including action-error logging, suspension bounds, rejected sub-second live intervals and explicit unsupported-version diagnostics. The suite completes in approximately 11.6 seconds. The process-selection fixture also passes its 17 assertions independently. ESLint passes across source and test JavaScript. The final npm audit reports zero vulnerabilities across all dependencies, including development tools. Packaging creates `dist/powershell-watchdog-0.5.5.vsix` and its SHA-256 file; archive inspection checks manifest identity, required runtime scripts and exclusion of historical/dev files.
+
+Both headless Edge browser harnesses pass: dashboard controls and chart layouts, and the near-15-MiB offline report with narrow/desktop layouts, escaping and CSP checks. This validates only the controlled browser harnesses, not an installed VS Code extension or native hover continuity.
+
+Evidence: `verification/audit-fixes/Unit.log`, `Selection.log`, `Dashboard.log`, `Report.log`, their QuietCli JSON results, `summary.json` and `monitor-summary.txt`. Tests ran in the background with a dedicated visible PowerShell monitor that closed after all results were saved. Reopen the saved summary with `.sandbox/Monitor-AuditChecks.ps1` from this checkout.
+
+The qualified Editor Services version remains **ms-vscode.powershell 2026.1.2**. This audit does not qualify a new launch format, a real Editor Services restart or the experimental upstream hover patch. Other versions continue to permit ordinary process monitoring and alerts.
+
+---
 # Qualification — 0.5.4 — release documentation and tooling
 
 Date: **4 November 2026**. This release adds mandatory changelog-before-commit instructions in `AGENTS.md`, documents the release checks, retains the experimental upstream hover-patch browser harness, and excludes `patches/**` from VSIX packaging. Manifest and lockfile versions are aligned with tag `v0.5.4`. The extension runtime is unchanged from 0.5.3.

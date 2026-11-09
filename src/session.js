@@ -2,6 +2,9 @@
 
 const path = require('node:path');
 
+// Add a version only after qualifying its launch artifacts and window ownership checks.
+const qualifiedPowerShellVersions = Object.freeze(['2026.1.2']);
+
 class WatchdogError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
@@ -40,8 +43,8 @@ async function resolveSession(vscode) {
   if (!installed.length) return { state: 'waiting', detail: 'Waiting for an already running PowerShell extension.' };
   if (installed.length !== 1) throw new WatchdogError('ambiguous', 'Multiple active PowerShell extensions.');
   const extension = installed[0];
-  if (extension.id.toLowerCase() !== 'ms-vscode.powershell' || extension.packageJSON.version !== '2026.1.2') {
-    throw new WatchdogError('unsupported', 'PowerShell extension version not qualified; expected ms-vscode.powershell 2026.1.2.');
+  if (extension.id.toLowerCase() !== 'ms-vscode.powershell' || !qualifiedPowerShellVersions.includes(extension.packageJSON.version)) {
+    throw new WatchdogError('unsupported', `Editor Services restart is disabled for ${extension.id} ${extension.packageJSON.version}. Qualified: ms-vscode.powershell ${qualifiedPowerShellVersions.join(', ')}. Process monitoring and alerts remain available. Use a qualified version or qualify this version before enabling restart support.`);
   }
   const api = extension.exports;
   if (typeof api?.getLogUri !== 'function' || typeof api?.getStorageUri !== 'function') throw new WatchdogError('unsupported', 'PowerShell session association API unavailable.');
@@ -60,4 +63,4 @@ async function resolveSession(vscode) {
   return { ...candidate, pid, terminal, extensionVersion: extension.packageJSON.version };
 }
 
-module.exports = { WatchdogError, candidateFromOptions, resolveSession, normalizePath };
+module.exports = { WatchdogError, candidateFromOptions, resolveSession, normalizePath, qualifiedPowerShellVersions };

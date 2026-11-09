@@ -1,3 +1,4 @@
+# Legacy single-session collector retained as a source reference only; excluded from the VSIX.
 # Objective: Measure one independently associated Editor Services process without executing code in that session.
 param(
     [Parameter(Mandatory)][int]$ProcessId,

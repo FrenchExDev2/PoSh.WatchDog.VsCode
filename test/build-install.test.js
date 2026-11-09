@@ -43,7 +43,7 @@ test('VSIX build installs the newly verified version in the selected profile, pr
   assert.ok(!f.report.LoadedModules.some((name) => /QuietCli/i.test(name)));
   assert.equal(f.report.Result.Channel, 'Stable');
   assert.equal(f.report.Result.Extension, 'FrenchExDev.fixture-watchdog@1.2.3');
-  assert.match(await fs.readFile(`${f.archive}.sha256`, 'utf8'), /^[a-f0-9]{64}  fixture-watchdog-1\.2\.3\.vsix\n$/);
+  assert.match(await fs.readFile(`${f.archive}.sha256`, 'utf8'), /^[a-f0-9]{64} {2}fixture-watchdog-1\.2\.3\.vsix\n$/);
 });
 
 for (const scenario of ['PackagingFailure', 'MissingPackage', 'WrongVersion', 'InstallationFailure', 'UnconfirmedVersion']) {

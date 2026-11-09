@@ -13,6 +13,9 @@ CLAUDE.md
 SKILLS.md
 RELEASING.md
 scripts/Build-InstallVsix.ps1
+scripts/Measure-Session.ps1
+src/journal.js
+eslint.config.js
 .gitignore
 .gitattributes
 .vscodeignore

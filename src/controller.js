@@ -84,7 +84,7 @@ class WatchdogController {
 
   activityBlocks(target) {
     const state = this.activity(target).state;
-    return this.engine.policy.deferWhileRunningCommands && state === 'busy' || this.engine.policy.requireKnownIdle && state !== 'idle';
+    return (this.engine.policy.deferWhileRunningCommands && state === 'busy') || (this.engine.policy.requireKnownIdle && state !== 'idle');
   }
 
   /** Cancel stale countdowns and evidence when a known terminal activity signal changes. */
@@ -228,6 +228,7 @@ class WatchdogController {
   async collectMeasurement() {
     const milliseconds = this.engine.policy.collectTimeoutSeconds * 1000;
     if (this.dependencies.observe) return withDeadline(() => this.dependencies.observe(milliseconds, this.abort.signal), milliseconds, this.abort.signal);
+    // Legacy dependency adapter retained for isolated policy tests only; activation always injects observe.
     const started = this.now();
     const target = await withDeadline(() => this.dependencies.resolve(), milliseconds, this.abort.signal);
     if (!target?.pid) return { target, sample: null };
@@ -360,13 +361,13 @@ class WatchdogController {
       fresh.sample.privateBytes < processPolicy(this.engine.policy, fresh.sample.kind).restartPrivateGiB * (1024 ** 3) ||
       this.engine.suspendUntil > this.now() || this.engine.suspendedReason ||
       this.activityBlocks(fresh.target) ||
-      (this.engine.policy.deferWhileDebugging && this.dependencies.debugging())))) {
+      ((this.engine.policy.deferWhileDebugging && this.dependencies.debugging()))))) {
       this.engine.resetSeries();
       this.publish('deferred', 'Restart deferred after the final activity check.');
       return false;
     }
     const commands = await this.dependencies.commands();
-    if (revision !== this.revision || this.disposed || (automatic && (this.activityBlocks(fresh.target) || this.engine.policy.deferWhileDebugging && this.dependencies.debugging()))) {
+    if (revision !== this.revision || this.disposed || (automatic && (this.activityBlocks(fresh.target) || (this.engine.policy.deferWhileDebugging && this.dependencies.debugging())))) {
       this.engine.resetSeries();
       return false;
     }
@@ -391,7 +392,7 @@ class WatchdogController {
     if (revision !== this.revision || this.disposed || (automatic && (!this.engine.policy.enabled ||
       this.engine.policy.mode !== 'automatic' || this.engine.suspendUntil > this.now() ||
       this.activityBlocks(fresh.target) ||
-      (this.engine.policy.deferWhileDebugging && this.dependencies.debugging())))) {
+      ((this.engine.policy.deferWhileDebugging && this.dependencies.debugging()))))) {
       if (automatic && this.engine.restarts[requestIndex] === requestedAt) this.engine.restarts.splice(requestIndex, 1);
       if (this.engine.suspendedReason === pendingReason) this.engine.suspendedReason = previousReason;
       this.engine.resetSeries();

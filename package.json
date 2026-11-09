@@ -2,11 +2,11 @@
   "name": "powershell-watchdog",
   "displayName": "PowerShell Memory Watchdog",
   "description": "Monitor memory of pwsh processes owned by each local VS Code window on Windows.",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "publisher": "FrenchExDev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FrenchExDev2/PoSh.WatchDog.PoSh.git"
+    "url": "https://github.com/FrenchExDev2/PoSh.WatchDog.VsCode.git"
   },
   "license": "MIT",
   "engines": {
@@ -44,7 +44,8 @@
     "test:integration": "node test/run-integration.js",
     "test:report-browser": "node test/run-report-browser.js",
     "test:dashboard-browser": "node test/run-dashboard-browser.js",
-    "test:features-integration": "node test/run-features-integration.js"
+    "test:features-integration": "node test/run-features-integration.js",
+    "lint": "eslint src test eslint.config.js"
   },
   "contributes": {
     "commands": [
@@ -338,7 +339,21 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@vscode/test-electron": "3.1.0",
-    "@vscode/vsce": "4.1.0"
+    "@vscode/vsce": "4.1.0",
+    "eslint": "10.14.0",
+    "globals": "17.14.0"
+  },
+  "overrides": {
+    "@vscode/vsce": {
+      "minimatch": "11.0.1"
+    },
+    "eslint": {
+      "minimatch": "11.0.1"
+    },
+    "@eslint/config-array": {
+      "minimatch": "11.0.1"
+    }
   }
 }

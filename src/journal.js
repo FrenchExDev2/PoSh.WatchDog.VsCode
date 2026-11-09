@@ -1,3 +1,4 @@
+// Legacy journal retained for historical regression tests only; production uses history.js.
 'use strict';
 
 const fs = require('node:fs/promises');

@@ -2,7 +2,7 @@
 
 const vscode = require('vscode');
 const { readMachinePolicy } = require('./configuration');
-const { WatchdogError } = require('./session');
+const { WatchdogError, qualifiedPowerShellVersions } = require('./session');
 const { WindowProcessObserver } = require('./observer');
 const { describeStatus } = require('./presentation');
 const path = require('node:path');
@@ -30,6 +30,10 @@ function environmentProblem() {
 }
 
 async function activate(context) {
+  const output = vscode.window.createOutputChannel('PowerShell Watchdog', { log: true });
+  context.subscriptions.push(output);
+  /** Keep action failures in the local VS Code log with their original stack. */
+  const logError = (action, error) => output.error(`${action}: ${error instanceof Error ? error.stack || error.message : String(error)}`);
   const reportPanel = createReportPanel(vscode);
   context.subscriptions.push(reportPanel);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
@@ -63,22 +67,23 @@ async function activate(context) {
         if (action === 'Cancel restart') await controller.cancelRestart();
         if (action === 'Postpone 5 minutes') await controller.postponeRestart();
         if (action === 'Restart now') await controller.restartNow();
-      }).catch(() => {});
+      }).catch((error) => logError('Restart notification', error));
       return;
     }
     void vscode.window.showWarningMessage(message, 'Diagnostics', 'Suspend 15 minutes').then(async (action) => {
       if (action === 'Diagnostics') await vscode.commands.executeCommand('powershellWatchdog.diagnostics');
       if (action === 'Suspend 15 minutes') await controller.suspend(15);
-    }).catch(() => {});
+    }).catch((error) => logError('Warning notification', error));
   };
   const initialPolicy = readPolicy();
   const journal = new PersistentJournal(path.join(context.storageUri?.fsPath || context.globalStorageUri.fsPath, 'history'), initialPolicy);
   await journal.ready;
   controller = new WatchdogController({
-    observe: (milliseconds, signal) => {
+    observe: async (milliseconds, signal) => {
       const problem = environmentProblem();
       if (problem) throw new WatchdogError('unsupported', problem);
-      return observer.observe(milliseconds, signal);
+      try { return await observer.observe(milliseconds, signal); }
+      catch (error) { logError('Process observation', error); throw error; }
     },
     commands: () => vscode.commands.getCommands(true),
     restart: () => vscode.commands.executeCommand('PowerShell.RestartSession'),
@@ -89,7 +94,7 @@ async function activate(context) {
     onChange: update, notice,
   }, initialPolicy, context.workspaceState.get('watchdog.policyState', {}));
 
-  dashboard = createDashboard(vscode, { getSnapshot: () => controller.snapshot(), onAction: async (action, value) => {
+  dashboard = createDashboard(vscode, { getSnapshot: () => controller.snapshot(), onError: logError, onAction: async (action, value) => {
     if (action === 'refresh') return controller.tick();
     if (action === 'showTerminal') {
       if (!observer.showTerminal(value)) void vscode.window.showInformationMessage('This terminal is no longer available in this window. Collect again to refresh the process inventory.');
@@ -101,7 +106,10 @@ async function activate(context) {
 
   const register = (name, callback) => context.subscriptions.push(vscode.commands.registerCommand(`powershellWatchdog.${name}`, async () => {
     try { return await callback(); }
-    catch { void vscode.window.showErrorMessage('PowerShell Watchdog action failed. Open diagnostics and check settings or storage access.'); }
+    catch (error) {
+      logError(`Command ${name}`, error);
+      void vscode.window.showErrorMessage('PowerShell Watchdog action failed. See Output → PowerShell Watchdog for details.');
+    }
   }));
   const setEnabled = (value) => vscode.workspace.getConfiguration(section).update('enabled', value, vscode.ConfigurationTarget.Global);
   /** Apply the enabled setting and clear persisted suspension before requesting fresh evidence. */
@@ -116,7 +124,7 @@ async function activate(context) {
   register('disable', () => setEnabled(false));
   register('suspend', async () => {
     const value = await vscode.window.showInputBox({ prompt: 'Suspend monitoring for how many minutes?', value: '15',
-      validateInput: (text) => Number.isFinite(Number(text)) && Number(text) > 0 && Number(text) <= 10080 ? null : 'Enter a duration between 0 and 10080 minutes.' });
+      validateInput: (text) => Number.isFinite(Number(text)) && Number(text) > 0 && Number(text) <= 10080 ? null : 'Enter a duration greater than 0 and at most 10080 minutes.' });
     if (value !== undefined) await controller.suspend(Number(value));
   });
   register('resume', resumeMonitoring);
@@ -147,7 +155,7 @@ async function activate(context) {
       ...snapshot, environment: { vscode: vscode.version, app: vscode.env.appName, platform: process.platform,
         remote: vscode.env.remoteName || null, powershellExtension: vscode.extensions.getExtension('ms-vscode.powershell')?.packageJSON.version || null },
       limitations: ['Activity is known only from observed VS Code shell execution events; unknown never means idle. Editor Services may not expose those events.', 'Ordinary terminal and child pwsh processes generate alerts; automatic restart is limited to verified Editor Services.',
-        'Editor Services automatic restart association supports ms-vscode.powershell 2026.1.2; other pwsh measurement does not require it.',
+        `Editor Services restart association supports ms-vscode.powershell ${qualifiedPowerShellVersions.join(', ')}; other pwsh measurement does not require it.`,
         'Stable and Insiders qualification results are recorded separately in QUALIFICATION.md.'],
     }, null, 2) });
     await vscode.window.showTextDocument(document, { preview: true });
@@ -169,7 +177,7 @@ async function activate(context) {
       onOpenFailure: (filePath) => {
         void vscode.window.showWarningMessage(`HTML report saved at ${filePath}. The VS Code diagnostic tab could not be opened.`, 'Reveal report').then(async (choice) => {
           if (choice === 'Reveal report') await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(filePath));
-        }).catch(() => {});
+        }).catch((error) => logError('Reveal report', error));
       },
     });
     return vscode.Uri.file(result.filePath);

@@ -12,11 +12,11 @@ Windows Desktop only. Runs locally, with no runtime npm dependencies or telemetr
 
 ## Install
 
-Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.2.vsix`, then reload the window if upgrading.
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.5.vsix`, then reload the window if upgrading.
 
 Requires **VS Code 1.114+** (Stable or Insiders), **Windows** and **PowerShell 7 Core** for the independent collector. Monitoring ordinary processes needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
 
-Automatic Editor Services restart requires **ms-vscode.powershell 2026.1.2** and a verified association with the current window. Unknown versions or ambiguous associations leave monitoring and alerts available. Remote windows, browsers, Linux and macOS are unsupported.
+Automatic Editor Services restart requires **ms-vscode.powershell 2026.1.2** and a verified association with the current window. The immutable allowlist in `src/session.js` intentionally admits only qualified launch formats: a version change may invalidate process association. Qualify the launch artifacts and cross-window ownership tests before adding a version; there is no user override. Diagnostics show the detected version, qualified versions and the reason restart is unavailable. Unknown versions or ambiguous associations leave monitoring and alerts available. Remote windows, browsers, Linux and macOS are unsupported.
 
 ## Use
 
@@ -47,7 +47,7 @@ One GiB is 1,073,741,824 bytes.
 
 Open the **PowerShell Watchdog** activity-bar view or run **PowerShell Watchdog: Open Live Dashboard** for a larger editor tab. Both receive the same live measurements.
 
-- At the top, **Live monitoring → Refresh interval** configures live collection: **0 (off), 250 ms, 500 ms, 1 s, 2 s or 5 s**, shared between this window's dashboard views. The current cadence appears below the selector. The delay starts after collection completes; live collection pauses while every dashboard is hidden. Off preserves the normal Watchdog schedule. The selection lasts for the current extension session.
+- At the top, **Live monitoring → Refresh interval** configures live collection: **0 (off), 2 s or 5 s**, shared between this window's dashboard views. The current cadence appears below the selector. Each collection launches an independent PowerShell process, so the minimum live delay is two seconds. The delay starts after collection completes; live collection pauses while every dashboard is hidden. Off preserves the normal Watchdog schedule. The selection lasts for the current extension session.
 - Private and resident memory curves with process selection, creation-time identities and explicit collection gaps. Blue curves show private memory; purple dashed curves show resident memory. The vertical axis has Gio (GiB) graduations and horizontal grid lines, with readable labels that adapt to the sidebar width.
 - **Development, Tests and Build thresholds appear together** on the diagram, using current user settings and absolute overrides for the selected process kind. The active profile is marked in the legend; dotted lines show warning thresholds and long-dashed lines show high thresholds. Toggle **Show all workload profiles** to hide these comparison lines.
 - Processes grouped by terminal/root, sorted by private memory, CPU, PID or process tree; filter by Editor Services, terminal or child.
@@ -109,6 +109,7 @@ Failed or timed-out restart requests, persistent high memory after stabilization
 
 From the command palette:
 
+- **Output → PowerShell Watchdog** retains local action and collection errors with their original details. No logs are uploaded.
 - **PowerShell Watchdog: Show Diagnostics** opens JSON with the policy, process inventory, decisions, errors and environment versions.
 - **PowerShell Watchdog: Open Live Dashboard** opens the live process/history/health view.
 - **PowerShell Watchdog: Open Visual Diagnostics (HTML)** saves an offline report and displays it in a VS Code editor tab. It includes memory curves, process selection, observed peaks and recorded events. Running the command again refreshes the same tab.
@@ -128,7 +129,7 @@ Only processes with a verifiable ownership chain to the current window and the e
 
 ## Development and details
 
-Development requires Node 22+. Install tools with `npm ci --ignore-scripts`, run `node --test test/*.test.js`, and package with `node node_modules/@vscode/vsce/vsce package --no-dependencies --out dist/`. Agents must follow the repository's QuietCli instructions.
+Development requires Node 22.13+ (ESLint requirement); the extension runtime still supports Node 22+. Install tools with `npm ci --ignore-scripts`, run `npm run lint` and `node --test test/*.test.js`, and package with `node node_modules/@vscode/vsce/vsce package --no-dependencies --out dist/`. Agents must follow the repository's QuietCli instructions.
 
 To build and install the current version automatically, run in PowerShell Core 7.6+:
 
@@ -144,3 +145,7 @@ The script locates the project independently of the current directory, uses loca
 - [Qualification](QUALIFICATION.md): tested environments, browser and integration evidence, and remaining limits.
 - [Release guide](RELEASING.md): automated Marketplace publication from a version tag.
 - [Changelog](CHANGELOG.md).
+
+The production observer uses `Measure-WindowProcesses.ps1`. The controller’s legacy injected `resolve`/`collect` adapter exists only for isolated regression fixtures. The old `Measure-Session.ps1` and `src/journal.js` remain historical test/reference sources and are excluded from the VSIX. `collector.js` now provides only the shared deadline helper.
+
+The development-only `minimatch` overrides for `@vscode/vsce`, `eslint` and `@eslint/config-array` select 11.0.1 to address GHSA-g3hv-75wg-m249 until these tools update their declared ranges. Packaging and file-list checks must pass when changing this override.

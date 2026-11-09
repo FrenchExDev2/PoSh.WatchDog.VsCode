@@ -72,7 +72,7 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
   let previousWarnings = new Set();
   for (const entry of entries) {
     const warnings = new Set(entry.processes.filter((item) => ['warning', 'confirmed'].includes(item.state)).map((item) => `${item.id}:${item.state}`));
-    if ((entry.state !== previousState && (entry.state !== 'normal' && entry.state !== 'waiting' || previousState !== null)) ||
+    if ((entry.state !== previousState && ((entry.state !== 'normal' && entry.state !== 'waiting') || previousState !== null)) ||
         /^Restart\b/.test(entry.decision) || entry.collectionErrors > 0 || [...warnings].some((key) => !previousWarnings.has(key))) {
       events.push({ at: entry.at, state: entry.state, decision: entry.decision,
         warnings: entry.processes.filter((item) => ['warning', 'confirmed'].includes(item.state)).map((item) => ({ pid: item.pid, state: item.state })) });
@@ -84,7 +84,7 @@ function buildReportModel({ snapshot, retained = {}, environment = {}, generated
   const inferredInterval = gaps.length ? gaps[Math.floor(gaps.length / 2)] : snapshot.policy?.sampleIntervalSeconds || 15;
   const issues = (retained.issues || []).map((issue) => ({ file: text(issue.file, 80), code: text(issue.code, 80) }));
   const incompleteEntries = entries.filter((entry) => entry.complete !== true || entry.omittedProcesses > 0 ||
-    entry.processCount !== null && entry.processCount > entry.processes.length || entry.processes.some((item) => item.privateBytes === null || item.workingSetBytes === null)).length;
+    (entry.processCount !== null && entry.processCount > entry.processes.length) || entry.processes.some((item) => item.privateBytes === null || item.workingSetBytes === null)).length;
   const env = {};
   for (const key of ['extension', 'vscode', 'app', 'platform', 'node', 'powershellExtension']) env[key] = text(environment[key], 160) || null;
   return { schemaVersion: 1, generatedAt, environment: env,

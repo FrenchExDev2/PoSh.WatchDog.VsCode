@@ -43,6 +43,12 @@ test('waiting does not activate PowerShell or start a session', async () => {
 });
 
 test('unknown extension versions and unavailable PIDs are explicit failures', async () => {
-  await assert.rejects(resolveSession(host([terminal()], true, '2027.1.0')), { code: 'unsupported' });
+  await assert.rejects(resolveSession(host([terminal()], true, '2027.1.0')), (error) => {
+    assert.equal(error.code, 'unsupported');
+    assert.match(error.message, /ms-vscode.powershell 2027.1.0/);
+    assert.match(error.message, /Qualified: ms-vscode.powershell 2026.1.2/);
+    assert.match(error.message, /monitoring and alerts remain available/);
+    return true;
+  });
   await assert.rejects(resolveSession(host([{ creationOptions: options(), processId: Promise.resolve(undefined) }])), { code: 'unknown' });
 });
