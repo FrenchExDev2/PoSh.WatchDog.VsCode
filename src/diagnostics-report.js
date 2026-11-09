@@ -105,8 +105,8 @@ function renderReportHtml(model) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; img-src data:; base-uri 'none'; form-action 'none'">
-<title>PowerShell Watchdog · Visual diagnostics</title><style nonce="${nonce}">${reportStyles}</style></head>
-<body><main><header><p class="eyebrow">POWERSHELL MEMORY WATCHDOG</p><h1>Window diagnostics<span class="badge">OFFLINE REPORT</span></h1><p id="subtitle"></p></header>
+<title>Memory Watchdog · Visual diagnostics</title><style nonce="${nonce}">${reportStyles}</style></head>
+<body><main><header><p class="eyebrow">FRENCHEXDEV MEMORY WATCHDOG</p><h1>Window diagnostics<span class="badge">OFFLINE REPORT</span></h1><p id="subtitle"></p></header>
 <section id="summary" class="cards" aria-label="Current measurements"></section>
 <aside id="quality" aria-label="Data coverage"></aside>
 <section class="panel"><div class="section-head"><div><h2>Memory over time</h2><p>Private committed and resident memory, measured independently.</p></div><label>Process<select id="process-select"></select></label></div>

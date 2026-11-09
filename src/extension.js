@@ -30,14 +30,14 @@ function environmentProblem() {
 }
 
 async function activate(context) {
-  const output = vscode.window.createOutputChannel('PowerShell Watchdog', { log: true });
+  const output = vscode.window.createOutputChannel('Memory Watchdog', { log: true });
   context.subscriptions.push(output);
   /** Keep action failures in the local VS Code log with their original stack. */
   const logError = (action, error) => output.error(`${action}: ${error instanceof Error ? error.stack || error.message : String(error)}`);
   const reportPanel = createReportPanel(vscode);
   context.subscriptions.push(reportPanel);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
-  status.name = 'PowerShell Memory Watchdog';
+  status.name = 'FrenchExDev Memory Watchdog';
   status.command = 'powershellWatchdog.menu';
   status.show();
   const debugSessions = new Set();
@@ -108,7 +108,7 @@ async function activate(context) {
     try { return await callback(); }
     catch (error) {
       logError(`Command ${name}`, error);
-      void vscode.window.showErrorMessage('PowerShell Watchdog action failed. See Output → PowerShell Watchdog for details.');
+      void vscode.window.showErrorMessage('Memory Watchdog action failed. See Output → Memory Watchdog for details.');
     }
   }));
   const setEnabled = (value) => vscode.workspace.getConfiguration(section).update('enabled', value, vscode.ConfigurationTarget.Global);
@@ -164,7 +164,7 @@ async function activate(context) {
     const items = [ ['Live dashboard', 'dashboard'], ['Visual diagnostics (HTML)', 'visualDiagnostics'], ['Diagnostics (JSON)', 'diagnostics'], ['Workload profile…', 'selectProfile'],
       ['Cancel scheduled restart', 'cancelRestart'], ['Postpone restarts 5 minutes', 'postponeRestart'], ['Restart scheduled session now', 'restartNow'], ['Enable', 'enable'], ['Disable', 'disable'],
       ['Suspend…', 'suspend'], ['Resume', 'resume'], ['Change mode…', 'changeMode'], ['Restart session…', 'restart'] ];
-    const selection = await vscode.window.showQuickPick(items.map(([label, action]) => ({ label, action })), { title: 'PowerShell Memory Watchdog' });
+    const selection = await vscode.window.showQuickPick(items.map(([label, action]) => ({ label, action })), { title: 'FrenchExDev Memory Watchdog' });
     if (selection) await vscode.commands.executeCommand(`powershellWatchdog.${selection.action}`);
   });
   register('visualDiagnostics', async () => {

@@ -159,7 +159,7 @@ jobs:
             $release = Invoke-RestMethod -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" -Headers $headers
           } catch {
             if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
-            gh release create $env:RELEASE_TAG "dist/$env:VSIX_NAME" "dist/$env:VSIX_NAME.sha256" --verify-tag --title "PowerShell Memory Watchdog $env:RELEASE_TAG" --generate-notes
+            gh release create $env:RELEASE_TAG "dist/$env:VSIX_NAME" "dist/$env:VSIX_NAME.sha256" --verify-tag --title "FrenchExDev Memory Watchdog $env:RELEASE_TAG" --generate-notes
             exit 0
           }
           foreach ($path in @("dist/$env:VSIX_NAME", "dist/$env:VSIX_NAME.sha256")) {

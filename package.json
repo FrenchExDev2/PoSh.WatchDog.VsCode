@@ -1,8 +1,8 @@
 {
   "name": "powershell-watchdog",
-  "displayName": "PowerShell Memory Watchdog",
-  "description": "Monitor memory of pwsh processes owned by each local VS Code window on Windows.",
-  "version": "0.5.5",
+  "displayName": "FrenchExDev Memory Watchdog",
+  "description": "Per-window memory watchdog for VS Code on Windows: monitors terminal and child processes, alerts on high memory and can restart a verified editor session that stays too high. Works with the PowerShell extension (ms-vscode.powershell) and pwsh terminals.",
+  "version": "0.5.6",
   "publisher": "FrenchExDev",
   "repository": {
     "type": "git",
@@ -18,9 +18,11 @@
     "Other"
   ],
   "keywords": [
-    "PowerShell",
     "memory",
-    "watchdog"
+    "watchdog",
+    "process",
+    "language server",
+    "PowerShell"
   ],
   "main": "./src/extension.js",
   "extensionKind": [
@@ -51,63 +53,63 @@
     "commands": [
       {
         "command": "powershellWatchdog.enable",
-        "title": "PowerShell Watchdog: Enable"
+        "title": "Memory Watchdog: Enable"
       },
       {
         "command": "powershellWatchdog.disable",
-        "title": "PowerShell Watchdog: Disable"
+        "title": "Memory Watchdog: Disable"
       },
       {
         "command": "powershellWatchdog.suspend",
-        "title": "PowerShell Watchdog: Suspend…"
+        "title": "Memory Watchdog: Suspend…"
       },
       {
         "command": "powershellWatchdog.resume",
-        "title": "PowerShell Watchdog: Resume"
+        "title": "Memory Watchdog: Resume"
       },
       {
         "command": "powershellWatchdog.changeMode",
-        "title": "PowerShell Watchdog: Change Mode…"
+        "title": "Memory Watchdog: Change Mode…"
       },
       {
         "command": "powershellWatchdog.restart",
-        "title": "PowerShell Watchdog: Restart Editor Services Session…"
+        "title": "Memory Watchdog: Restart Editor Services Session…"
       },
       {
         "command": "powershellWatchdog.diagnostics",
-        "title": "PowerShell Watchdog: Show Diagnostics"
+        "title": "Memory Watchdog: Show Diagnostics"
       },
       {
         "command": "powershellWatchdog.visualDiagnostics",
-        "title": "PowerShell Watchdog: Open Visual Diagnostics (HTML)"
+        "title": "Memory Watchdog: Open Visual Diagnostics (HTML)"
       },
       {
         "command": "powershellWatchdog.menu",
-        "title": "PowerShell Watchdog: Show Actions"
+        "title": "Memory Watchdog: Show Actions"
       },
       {
         "command": "powershellWatchdog.dashboard",
-        "title": "PowerShell Watchdog: Open Live Dashboard"
+        "title": "Memory Watchdog: Open Live Dashboard"
       },
       {
         "command": "powershellWatchdog.cancelRestart",
-        "title": "PowerShell Watchdog: Cancel Scheduled Restart"
+        "title": "Memory Watchdog: Cancel Scheduled Restart"
       },
       {
         "command": "powershellWatchdog.postponeRestart",
-        "title": "PowerShell Watchdog: Postpone Restarts 5 Minutes"
+        "title": "Memory Watchdog: Postpone Restarts 5 Minutes"
       },
       {
         "command": "powershellWatchdog.restartNow",
-        "title": "PowerShell Watchdog: Restart Scheduled Session Now"
+        "title": "Memory Watchdog: Restart Scheduled Session Now"
       },
       {
         "command": "powershellWatchdog.selectProfile",
-        "title": "PowerShell Watchdog: Select Workload Profile…"
+        "title": "Memory Watchdog: Select Workload Profile…"
       }
     ],
     "configuration": {
-      "title": "PowerShell Watchdog",
+      "title": "Memory Watchdog",
       "properties": {
         "frenchexdev.powershellWatchdog.enabled": {
           "type": "boolean",
@@ -323,7 +325,7 @@
       "activitybar": [
         {
           "id": "powershellWatchdog",
-          "title": "PowerShell Watchdog",
+          "title": "Memory Watchdog",
           "icon": "images/watchdog.svg"
         }
       ]

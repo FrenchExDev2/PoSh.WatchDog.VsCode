@@ -26,7 +26,7 @@ Under publisher **FrenchExDev**, open **Trusted Publishing** and create a policy
 | --- | --- |
 | Provider | GitHub Actions |
 | Repository owner | `FrenchExDev2` |
-| Repository | `PoSh.WatchDog.PoSh` |
+| Repository | `PoSh.WatchDog.VsCode` |
 | Workflow | `publish.yaml` |
 | Environment | `release` |
 
@@ -55,7 +55,7 @@ Before every `git commit`, update `CHANGELOG.md` for all files included in that 
    the **Test and publish** build succeeds on the intended commit.
 3. Create and push tag `v0.2.0` on that commit, or the corresponding tag for a
    later version. The tag must include the workflow and all release source files.
-4. Follow the workflow in [GitHub Actions](https://github.com/FrenchExDev2/PoSh.WatchDog.PoSh/actions/workflows/publish.yaml).
+4. Follow the workflow in [GitHub Actions](https://github.com/FrenchExDev2/PoSh.WatchDog.VsCode/actions/workflows/publish.yaml).
    A successful publish job uploads to Marketplace and creates the GitHub release
    with its assets. Reruns preserve matching assets and upload missing ones;
    conflicting existing assets fail explicitly. Marketplace validation and public availability can lag

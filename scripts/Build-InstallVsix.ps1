@@ -140,5 +140,5 @@ if (-not ($installed.Lines | Where-Object { $_.Trim() -ieq $expected })) {
 [pscustomobject]@{
     Extension = $expected; Channel = $Channel; CodeCliPath = $CodeCliPath; Profile = $Profile
     VSIX = $archive; SHA256 = $hash
-    NextStep = 'Dans VS Code : Developer: Reload Window, puis PowerShell Watchdog: Resume.'
+    NextStep = 'Dans VS Code : Developer: Reload Window, puis Memory Watchdog: Resume.'
 }

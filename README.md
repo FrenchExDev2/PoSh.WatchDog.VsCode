@@ -1,18 +1,20 @@
 <p align="center">
-  <img src="./images/icon.png" alt="PowerShell Memory Watchdog logo" width="150px" />
+  <img src="./images/icon.png" alt="FrenchExDev Memory Watchdog logo" width="150px" />
 </p>
 
-# FrenchExDev.PoSh.WatchDog.VsCode
+# FrenchExDev Memory Watchdog
 
-PowerShell Memory Watchdog for VS Code.
+Per-window memory watchdog for VS Code. Works with the PowerShell extension (`ms-vscode.powershell`) and `pwsh` terminals.
 
-Monitor the memory used by PowerShell processes in each VS Code window. Get alerts for terminals and nested `pwsh` processes, and optionally restart a verified PowerShell Editor Services session when its memory stays too high.
+Renamed in 0.5.6 to follow the Microsoft trademark guidelines. The extension ID `FrenchExDev.powershell-watchdog`, its commands and its `frenchexdev.powershellWatchdog.*` settings are unchanged.
+
+Monitor the memory used by `pwsh` processes in each VS Code window. Get alerts for terminals and nested `pwsh` processes, and optionally restart a verified PowerShell Editor Services session when its memory stays too high.
 
 Windows Desktop only. Runs locally, with no runtime npm dependencies or telemetry.
 
 ## Install
 
-Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.5.vsix`, then reload the window if upgrading.
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.5.6.vsix`, then reload the window if upgrading.
 
 Requires **VS Code 1.114+** (Stable or Insiders), **Windows** and **PowerShell 7 Core** for the independent collector. Monitoring ordinary processes needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
 
@@ -45,7 +47,7 @@ One GiB is 1,073,741,824 bytes.
 
 ## Live dashboard
 
-Open the **PowerShell Watchdog** activity-bar view or run **PowerShell Watchdog: Open Live Dashboard** for a larger editor tab. Both receive the same live measurements.
+Open the **Memory Watchdog** activity-bar view or run **Memory Watchdog: Open Live Dashboard** for a larger editor tab. Both receive the same live measurements.
 
 - At the top, **Live monitoring → Refresh interval** configures live collection: **0 (off), 2 s or 5 s**, shared between this window's dashboard views. The current cadence appears below the selector. Each collection launches an independent PowerShell process, so the minimum live delay is two seconds. The delay starts after collection completes; live collection pauses while every dashboard is hidden. Off preserves the normal Watchdog schedule. The selection lasts for the current extension session.
 - Private and resident memory curves with process selection, creation-time identities and explicit collection gaps. Blue curves show private memory; purple dashed curves show resident memory. The vertical axis has Gio (GiB) graduations and horizontal grid lines, with readable labels that adapt to the sidebar width.
@@ -70,7 +72,7 @@ With the default global thresholds (`warningPrivateGiB: 4`, `restartPrivateGiB: 
 | `tests` | Test suites that need more memory | ×1.5 | 6 GiB | 12 GiB |
 | `build` | Memory-intensive builds | ×2 | 8 GiB | 16 GiB |
 
-Choose a profile manually through **PowerShell Watchdog: Select Workload Profile…** or the dashboard. Watchdog saves the choice in VS Code user settings; it does not automatically switch profiles when tests or builds start, or revert when they finish. Selecting a profile only changes these memory thresholds; it does not launch a workload or change PowerShell's execution settings.
+Choose a profile manually through **Memory Watchdog: Select Workload Profile…** or the dashboard. Watchdog saves the choice in VS Code user settings; it does not automatically switch profiles when tests or builds start, or revert when they finish. Selecting a profile only changes these memory thresholds; it does not launch a workload or change PowerShell's execution settings.
 
 The multiplier applies to your configured global thresholds, so changing those base values also changes the table's effective values. An explicit `processThresholds` value is an **absolute GiB threshold**: it takes precedence for that process kind and is never multiplied. Warning and high overrides are independent; an omitted value still uses the corresponding global threshold multiplied by the profile factor.
 
@@ -109,11 +111,11 @@ Failed or timed-out restart requests, persistent high memory after stabilization
 
 From the command palette:
 
-- **Output → PowerShell Watchdog** retains local action and collection errors with their original details. No logs are uploaded.
-- **PowerShell Watchdog: Show Diagnostics** opens JSON with the policy, process inventory, decisions, errors and environment versions.
-- **PowerShell Watchdog: Open Live Dashboard** opens the live process/history/health view.
-- **PowerShell Watchdog: Open Visual Diagnostics (HTML)** saves an offline report and displays it in a VS Code editor tab. It includes memory curves, process selection, observed peaks and recorded events. Running the command again refreshes the same tab.
-- **PowerShell Watchdog: Restart Editor Services Session…** requests a manual editor-session restart.
+- **Output → Memory Watchdog** retains local action and collection errors with their original details. No logs are uploaded.
+- **Memory Watchdog: Show Diagnostics** opens JSON with the policy, process inventory, decisions, errors and environment versions.
+- **Memory Watchdog: Open Live Dashboard** opens the live process/history/health view.
+- **Memory Watchdog: Open Visual Diagnostics (HTML)** saves an offline report and displays it in a VS Code editor tab. It includes memory curves, process selection, observed peaks and recorded events. Running the command again refreshes the same tab.
+- **Memory Watchdog: Restart Editor Services Session…** requests a manual editor-session restart.
 
 HTML reports are dated snapshots retained in the extension's storage. Generate a new report to refresh it. Exporting does not trigger collection or restart. Gaps remain visible and recorded peaks are not lifetime maxima.
 

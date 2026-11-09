@@ -189,7 +189,7 @@ exports.run = async () => {
     const htmlUri = await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');
     assert.equal(htmlUri.scheme, 'file');
     const diagnosticTabs = () => vscode.window.tabGroups.all.flatMap((group) => group.tabs)
-      .filter((tab) => tab.input instanceof vscode.TabInputWebview && tab.label === 'PowerShell Watchdog · Visual diagnostics');
+      .filter((tab) => tab.input instanceof vscode.TabInputWebview && tab.label === 'Memory Watchdog · Visual diagnostics');
     await until(() => diagnosticTabs().some((tab) => tab.isActive), 'visual diagnostic editor tab');
     assert.equal(diagnosticTabs().length, 1);
     await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');

@@ -212,9 +212,9 @@ function dashboardClient() {
 
 function renderDashboardHtml() {
   const nonce = randomUUID();
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'"><title>PowerShell Watchdog · Live dashboard</title><style nonce="${nonce}">
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'"><title>Memory Watchdog · Live dashboard</title><style nonce="${nonce}">
 body{font-family:var(--vscode-font-family,system-ui);color:var(--vscode-foreground,#ddd);background:var(--vscode-editor-background,#181818);margin:0;padding:16px;line-height:1.45}main{max-width:1400px;margin:auto}h1{font-size:22px}h2{font-size:16px}section{border:1px solid var(--vscode-panel-border,#444);padding:14px;border-radius:8px;margin:14px 0}button,select{font:inherit;color:inherit;background:var(--vscode-dropdown-background,#333);border:1px solid var(--vscode-dropdown-border,#666);border-radius:4px;padding:5px 9px;max-width:100%}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:focus-visible,select:focus-visible{outline:2px solid var(--vscode-focusBorder,#55b5ef)}.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.muted{opacity:.8;font-size:12px}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:7px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--vscode-panel-border,#444)}th:first-child,td:first-child,td:nth-child(2){text-align:left}.group{text-align:left;background:var(--vscode-list-hoverBackground,#292929)}svg{width:100%;min-height:150px}dl{display:grid;grid-template-columns:minmax(100px,1fr) minmax(100px,2fr);gap:8px;font-size:12px}dd{margin:0;overflow-wrap:anywhere}dt{opacity:.8}li{overflow-wrap:anywhere;margin:8px 0}#countdown{border-color:#c79641}#process-select{width:100%}[hidden]{display:none!important}@media(max-width:400px){body{padding:8px}section{padding:9px}dl{grid-template-columns:1fr}dd{margin-bottom:6px}}
-</style></head><body><main><p class="muted">POWERSHELL MEMORY WATCHDOG · LIVE · v${version}</p><h1>Window dashboard</h1><p id="state">Waiting for a snapshot…</p><p id="detail"></p>
+</style></head><body><main><p class="muted">FRENCHEXDEV MEMORY WATCHDOG · LIVE · v${version}</p><h1>Window dashboard</h1><p id="state">Waiting for a snapshot…</p><p id="detail"></p>
 <p id="age" class="muted"></p><section id="live-controls" aria-labelledby="live-heading"><h2 id="live-heading">Live monitoring</h2><div class="toolbar"><label for="live-interval">Refresh interval</label><select id="live-interval"><option value="0">0 · Off</option><option value="2000">2 s</option><option value="5000">5 s</option></select><button id="refresh">Collect now</button></div><p id="live-status" class="muted" role="status">Live collection is off. Choose a refresh interval to enable it.</p></section><div class="toolbar"><button id="visualDiagnostics">Export HTML</button><button id="diagnostics">JSON diagnostics</button><label>Profile <select id="profile"><option value="development">Development · ×1</option><option value="tests">Tests · ×1.5</option><option value="build">Build · ×2</option></select></label></div>
 <section id="countdown" hidden aria-live="polite"><h2 id="countdown-text"></h2><div class="toolbar"><button id="cancelRestart">Cancel this episode</button><button id="postponeRestart">Postpone 5 minutes</button><button id="restartNow">Restart now</button></div></section><p id="postponed"></p>
 <section><h2>Memory history</h2><select id="process-select" aria-label="Chart process"></select><label><input id="show-profiles" type="checkbox" checked> Show all workload profiles</label><svg id="chart" viewBox="0 0 1000 210" role="img" aria-label="Private and resident memory over time with workload profile thresholds"></svg><ul id="chart-legend" class="muted"></ul><p id="chart-note" class="muted"></p></section>
@@ -236,7 +236,7 @@ function createDashboard(vscode, { getSnapshot, onAction, onError = () => {}, ti
       if (disposed || !visible()) return;
       collecting = true;
       try { await onAction('refresh'); }
-      catch (error) { onError('Live collection', error); if (!disposed) void vscode.window.showErrorMessage('Watchdog live collection failed. See Output → PowerShell Watchdog.'); }
+      catch (error) { onError('Live collection', error); if (!disposed) void vscode.window.showErrorMessage('Watchdog live collection failed. See Output → Memory Watchdog.'); }
       finally { collecting = false; if (!disposed) { update(); schedule(); } }
     }, liveIntervalMs);
   };
@@ -253,7 +253,7 @@ function createDashboard(vscode, { getSnapshot, onAction, onError = () => {}, ti
         if (actions.includes(message?.action)) await onAction(message.action);
         else if (message?.action === 'profile' && ['development', 'tests', 'build'].includes(message.profile)) await onAction('profile', message.profile);
         else if (message?.action === 'showTerminal' && typeof message.identity === 'string' && /^\d+:\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(message.identity)) await onAction('showTerminal', message.identity);
-      } catch (error) { onError('Dashboard action', error); void vscode.window.showErrorMessage('Watchdog dashboard action failed. See Output → PowerShell Watchdog.'); }
+      } catch (error) { onError('Dashboard action', error); void vscode.window.showErrorMessage('Watchdog dashboard action failed. See Output → Memory Watchdog.'); }
     });
     const visibility = (view.onDidChangeVisibility || view.onDidChangeViewState)?.call(view, schedule);
     view.onDidDispose(() => { receiving.dispose(); visibility?.dispose(); views.delete(view); if (panel === view) panel = undefined; schedule(); });
@@ -263,7 +263,7 @@ function createDashboard(vscode, { getSnapshot, onAction, onError = () => {}, ti
   };
   const provider = vscode.window.registerWebviewViewProvider('powershellWatchdog.dashboardView', { resolveWebviewView: attach });
   return {
-    open() { if (!panel) { panel = vscode.window.createWebviewPanel('powershellWatchdog.dashboard', 'PowerShell Watchdog · Live', vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: false }); attach(panel); } panel.reveal(); },
+    open() { if (!panel) { panel = vscode.window.createWebviewPanel('powershellWatchdog.dashboard', 'Memory Watchdog · Live', vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: false }); attach(panel); } panel.reveal(); },
     update,
     dispose() { disposed = true; timers.clearTimeout(timer); provider.dispose(); for (const view of [...views]) view.dispose(); views.clear(); },
   };

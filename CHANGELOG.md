@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.6 — 2026-11-09
+
+- Renamed to FrenchExDev Memory Watchdog (Microsoft trademark guidelines); no behavior change. Command titles, settings section, activity-bar view, output channel, status bar, dashboard, reports, README and release title use the new name. The extension ID `FrenchExDev.powershell-watchdog`, command IDs, view IDs and `frenchexdev.powershellWatchdog.*` settings are unchanged.
+- Correct the repository name in the release guide.
+
 ## 0.5.5 — 2026-11-05
 
 - Correct the repository URL and align the installation example with the packaged version.
