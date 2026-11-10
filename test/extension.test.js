@@ -22,6 +22,8 @@ async function fixture(enabled = true, delayedConfiguration = false, options = {
   let memoryBytes = GiB;
   let measuredAt = '2026-11-04T04:00:00Z';
   let intervals = 0;
+  const animationTimers = new Map();
+  let nextTimer = 0;
   const statusWrites = { text: 0, tooltip: 0, backgroundColor: 0 };
   const errors = [];
   let input;
@@ -63,6 +65,7 @@ async function fixture(enabled = true, delayedConfiguration = false, options = {
       setTargets(list) { observed.targets = list; }
       async observe() {
         collections++;
+        if (options.observe) await options.observe();
         return { target: { state: 'waiting' }, sample: null, inventory: { complete: true, errors: [], measuredAt,
           processes: [{ pid: 42, createdAt: '2026-11-02T10:00:00Z', privateBytes: memoryBytes,
             workingSetBytes: GiB, measuredAt, kind: 'terminal' }] } };
@@ -82,10 +85,12 @@ async function fixture(enabled = true, delayedConfiguration = false, options = {
   const source = await fs.readFile(require.resolve('../src/extension'), 'utf8');
   const sandbox = { module: { exports: {} }, process, setTimeout, clearTimeout, __dirname: require('node:path').join(__dirname, '..', 'src'),
     require: (name) => dependencies[name] || require(name.startsWith('./') ? `../src/${name.slice(2)}` : name),
-    setInterval: () => { intervals++; return 1; }, clearInterval() {} };
+    setInterval: (callback) => { intervals++; animationTimers.set(++nextTimer, callback); return nextTimer; },
+    clearInterval: (id) => { if (animationTimers.delete(id)) intervals--; } };
   vm.runInNewContext(source, sandbox, { filename: 'extension.js' });
   const api = await sandbox.module.exports.activate(context);
-  return { api, journal, commands, observed, messages, logs, globalValues, settings, statusWrites, errors, input: () => input, intervals: () => intervals,
+  return { api, journal, commands, observed, messages, logs, globalValues, settings, status, statusWrites, errors, input: () => input, intervals: () => intervals,
+    animate: () => { for (const callback of animationTimers.values()) callback(); },
     setMeasurement: (bytes, at) => { memoryBytes = bytes; measuredAt = at; }, stored: () => stored, collections: () => collections,
     dispose: () => context.subscriptions.forEach((item) => item.dispose()) };
 }
@@ -105,13 +110,15 @@ test('suspension validation explains the exclusive lower and inclusive upper bou
   for (const value of ['0.5', '1', '10080']) assert.equal(validate(value), null);
 });
 
-test('unchanged observations do not reassign the native tooltip or status, and no age timer runs', async (t) => {
+test('unchanged observations animate text only during collection and leave no idle timer', async (t) => {
   const f = await fixture();
   t.after(f.dispose);
   await f.commands.get('memoryWatchdog.enable')();
   const before = { ...f.statusWrites };
   await f.api.sampleNow(); await f.api.sampleNow();
-  assert.deepEqual(f.statusWrites, before);
+  assert.equal(f.statusWrites.text, before.text);
+  assert.equal(f.statusWrites.tooltip, before.tooltip);
+  assert.equal(f.statusWrites.backgroundColor, before.backgroundColor);
   assert.equal(f.intervals(), 0);
 });
 
@@ -126,6 +133,32 @@ test('a changed measurement still updates the hover and status through the colle
   assert.equal(f.statusWrites.text, before.text + 1);
   assert.equal(f.statusWrites.backgroundColor, before.backgroundColor);
 });
+
+for (const fails of [false, true]) {
+  test(`the spinner follows the real collection lifecycle (failure=${fails})`, async (t) => {
+    let finish;
+    const f = await fixture(true, false, { observe: () => new Promise((resolve, reject) => {
+      finish = () => fails ? reject(new Error('collection failed')) : resolve();
+    }) });
+    t.after(f.dispose);
+    const collection = f.commands.get('memoryWatchdog.enable')();
+    while (!finish) await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(f.intervals(), 1);
+    assert.match(f.status.text, /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/);
+    const before = { ...f.statusWrites };
+    const text = f.status.text;
+    f.animate();
+    assert.notEqual(f.status.text, text);
+    assert.equal(f.statusWrites.tooltip, before.tooltip);
+    const pose = f.status.text.match(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/)[0];
+    finish(); await collection;
+    assert.equal(f.intervals(), 0);
+    assert.equal(f.api.getSnapshot().health.collecting, false);
+    assert.ok(f.status.text.includes(pose), 'the last pose stays visible after collection');
+    if (fails) assert.match(f.status.text, /Measurement unavailable/);
+    else assert.match(f.status.text, /1 proc.*[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]$/);
+  });
+}
 
 for (const command of ['enable', 'resume']) {
   for (const enabled of [true, false]) {

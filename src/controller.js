@@ -339,6 +339,7 @@ class WatchdogController {
     } finally {
       this.health.lastCompletedAt = this.now(); this.health.durationMs = Math.max(0, this.now() - this.health.lastStartedAt);
       this.health.collecting = false;
+      if (!this.disposed) this.dependencies.onChange?.(this.snapshot());
     }
   }
 

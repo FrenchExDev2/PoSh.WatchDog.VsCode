@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.6.0 — 2026-11-09
+## 0.6.0 — 2026-11-10
+
+- Replace the normal status-bar Monitoring label with a persistent single-cell Braille loading indicator. Animate only during actual process collection, preserve the last frame between collections and keep explicit warning, disabled, suspended and error labels. Stop the animation on collection completion, failure and extension disposal without rewriting unchanged hover content.
+- Add timer lifecycle, fixed-position presentation and successful/failed collection regressions, a seeded 512-step state-sequence check and a complete ten-frame rotation check. Four targeted animation mutations are detected. A development-host preview measures a real PowerShell terminal; broader release validation and its limits are recorded in QUALIFICATION.md.
+- Update the native Desktop integration fixture to the 0.6 settings namespace and workload selector, with isolated per-target thresholds supplied through a config file.
 
 - Generic, multi-process watchdog: each target is a standalone `<name>.watchdog.json` config (match by process names, ownership in this window and an optional time-bounded command-line pattern; thresholds; notify-only or automatic restart through the target's own VS Code command). Profiles are lists of config names (`frenchexdev.memoryWatchdog.profiles`, `activeProfile`); the built-in `default` profile reproduces 0.5.x behavior with zero configuration.
 - Built-in configs: `pwsh-editor-services` (code-bound adapter, automatic `PowerShell.RestartSession`), `pwsh-terminals`, `pwsh-children`, `tsserver` and `csharp` (notify-only with their restart command declared), `all-terminals`.

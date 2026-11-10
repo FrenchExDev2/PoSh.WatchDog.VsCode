@@ -24,7 +24,7 @@ test('status and hover use appropriate units for total and individual memory', (
     { pid: 1, privateBytes: 64 * 1024 ** 2, workingSetBytes: 512 * 1024 },
     { pid: 2, privateBytes: 32 * 1024 ** 2, workingSetBytes: GiB },
   ] }));
-  assert.match(view.text, /2 proc.*96 MiB total.*Monitoring/);
+  assert.match(view.text, /2 proc.*96 MiB total.*⠋/);
   assert.match(view.tooltip, /private 64 MiB, resident 512 KiB/);
   assert.match(view.tooltip, /private 32 MiB, resident 1 GiB/);
 });
@@ -40,7 +40,7 @@ test('multiple processes show count and committed total with per-process details
     { pid: 1, privateBytes: GiB, workingSetBytes: GiB / 2, kind: 'terminal', createdAt: '2026-10-29' },
     { pid: 2, privateBytes: GiB / 2, workingSetBytes: GiB / 4, kind: 'child', createdAt: '2026-10-29' },
   ] }));
-  assert.match(view.text, /2 proc.*1\.5 GiB total.*Monitoring/);
+  assert.match(view.text, /2 proc.*1\.5 GiB total.*⠋/);
   assert.match(view.tooltip, /Thresholds apply to each process/);
   assert.match(view.tooltip, /other targets: alerts only/);
   assert.match(view.tooltip, /PID 2 \(child\)/);

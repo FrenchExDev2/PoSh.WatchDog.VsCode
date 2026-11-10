@@ -7,6 +7,7 @@ const { SECTION, LEGACY_SECTION, readMachinePolicy, readGlobals, readLegacyValue
 const { WatchdogError, qualifiedPowerShellVersions } = require('./session');
 const { WindowProcessObserver } = require('./observer');
 const { describeStatus } = require('./presentation');
+const { createLoadingSpinner } = require('./loading-spinner');
 const { PersistentJournal } = require('./history');
 const { ActivityTracker } = require('./activity');
 const { createDashboard } = require('./dashboard');
@@ -66,11 +67,20 @@ async function activate(context) {
   let controller;
   let dashboard;
   let statusBackground;
+  let statusSnapshot;
+  const spinner = createLoadingSpinner(() => {
+    if (!statusSnapshot) return;
+    const { text } = describeStatus(statusSnapshot, spinner.frame);
+    if (status.text !== text) status.text = text;
+  }, { setInterval, clearInterval });
+  context.subscriptions.push(spinner);
   let configState = { status: null, loaded: null, profile: null, directories: [] };
   const activity = new ActivityTracker(vscode.window, (terminal) => controller?.activityChanged(terminal));
   const observer = new WindowProcessObserver(vscode, { activity });
   const update = (snapshot) => {
-    const display = describeStatus(snapshot);
+    statusSnapshot = snapshot;
+    spinner.setCollecting(snapshot.health?.collecting === true);
+    const display = describeStatus(snapshot, spinner.frame);
     if (status.text !== display.text) status.text = display.text;
     if (status.tooltip !== display.tooltip) status.tooltip = display.tooltip;
     const configProblem = snapshot.configs?.errors > 0 || snapshot.configs?.pendingApprovals > 0;

@@ -14,14 +14,21 @@ async function main() {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'watchdog-features-native-'));
   const userData = path.join(directory, 'user-data'); const extensions = path.join(directory, 'extensions');
   const workspace = path.join(directory, 'workspace');
+  const configs = path.join(directory, 'configs');
   await fs.mkdir(path.join(userData, 'User'), { recursive: true }); await fs.mkdir(extensions); await fs.mkdir(workspace);
+  await fs.mkdir(configs);
+  await fs.writeFile(path.join(configs, 'pwsh-terminals.watchdog.json'), JSON.stringify({
+    schemaVersion: 1, name: 'pwsh-terminals', label: 'Native test terminals',
+    match: { processNames: ['pwsh'], ownership: 'terminal' },
+    thresholds: { warningPrivateGiB: 16, actionPrivateGiB: 32 }, action: { mode: 'notifyOnly' },
+  }, null, 2), 'utf8');
   await fs.writeFile(path.join(userData, 'User', 'settings.json'), JSON.stringify({
     'security.workspace.trust.enabled': false, 'telemetry.telemetryLevel': 'off', 'update.mode': 'none',
     'extensions.autoUpdate': false, 'extensions.autoCheckUpdates': false, 'workbench.startupEditor': 'none',
     'terminal.integrated.shellIntegration.enabled': true,
-    'frenchexdev.powershellWatchdog.mode': 'notifyOnly',
-    'frenchexdev.powershellWatchdog.warningPrivateGiB': 16, 'frenchexdev.powershellWatchdog.restartPrivateGiB': 32,
-    'frenchexdev.powershellWatchdog.sampleIntervalSeconds': 1,
+    'frenchexdev.memoryWatchdog.mode': 'notifyOnly',
+    'frenchexdev.memoryWatchdog.configPaths': [configs],
+    'frenchexdev.memoryWatchdog.sampleIntervalSeconds': 1,
   }, null, 2), 'utf8');
   delete process.env.ELECTRON_RUN_AS_NODE;
   try {

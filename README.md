@@ -39,7 +39,9 @@ Not yet verified on a real Linux or macOS machine, nor on arm64. On macOS thresh
 
 The status bar shows the measured process count and their total private memory:
 
-`3 proc · 430.08 MiB total · Monitoring`
+`3 proc · 430.08 MiB total · ⠋`
+
+The single-cell loading indicator stays visible in every state. It rotates through Braille frames during process collection, then rests in its last frame between refreshes. Warnings and other states keep their text labels beside it.
 
 A warning icon after the text means a config problem or a config waiting for approval (hover for details).
 

@@ -1,5 +1,7 @@
 'use strict';
 
+const { IDLE_FRAME } = require('./loading-spinner');
+
 /** Format a byte count in binary units with at most two decimal places. */
 function formatMemory(bytes) {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
@@ -18,19 +20,21 @@ const stateLabels = { normal: 'Monitoring', warning: 'Memory warning', confirmed
   suspended: 'Monitoring suspended', error: 'Measurement unavailable', ambiguous: 'Target ambiguous',
   unsupported: 'Environment unsupported', waiting: 'Waiting for processes in this window' };
 
-function describeStatus(snapshot) {
+function describeStatus(snapshot, spinner = IDLE_FRAME) {
   const processes = snapshot.processes || (snapshot.sample ? [snapshot.sample] : []);
   const count = processes.length;
   const complete = snapshot.inventory ? snapshot.inventory.complete === true : count > 0;
   const knownTotal = processes.reduce((total, sample) => total + sample.privateBytes, 0);
-  const label = stateLabels[snapshot.state] || snapshot.state;
+  const stateLabel = snapshot.state === 'waiting' && !count ? complete ? 'No monitored process' : 'Discovering processes' :
+    stateLabels[snapshot.state] || snapshot.state;
+  const label = snapshot.state === 'normal' ? spinner : `${spinner} · ${stateLabel}`;
   const automatic = (snapshot.targets || []).filter((target) => target.mode === 'automatic').map((target) => target.label);
   const mode = snapshot.mode === 'automatic' || automatic.length ? `Automatic restart: ${automatic.join(', ') || 'Editor Services'}; other targets: alerts only.` : 'All targets: alerts only.';
   const configs = snapshot.configs;
   const marker = configs?.errors || configs?.pendingApprovals ? ' $(warning)' : '';
   let text;
   if (snapshot.state === 'disabled' || (snapshot.state === 'suspended' && !count)) text = `$(pulse) Watchdog · ${label}${marker}`;
-  else if (!count) text = `$(pulse) Watchdog · ${snapshot.state === 'waiting' ? complete ? 'No monitored process' : 'Discovering processes' : label}${marker}`;
+  else if (!count) text = `$(pulse) Watchdog · ${label}${marker}`;
   else text = `$(pulse) ${count} proc · ${complete ? '' : '≥ '}${formatMemory(knownTotal)} total · ${label}${marker}`;
   const sorted = [...processes].sort((left, right) => right.privateBytes - left.privateBytes);
   // An absolute timestamp stays stable between observations; a ticking age replaces the native hover every second.

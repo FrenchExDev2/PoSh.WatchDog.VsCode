@@ -13,7 +13,7 @@ exports.run = async () => {
   try {
     const extension = vscode.extensions.getExtension('FrenchExDev.powershell-watchdog');
     assert.ok(extension); const api = await extension.activate();
-    terminal = vscode.window.createTerminal({ name: 'Watchdog 0.4 native fixture', shellPath: process.env.WATCHDOG_TEST_PWSH, shellArgs: ['-NoLogo', '-NoProfile'] });
+    terminal = vscode.window.createTerminal({ name: 'Watchdog native fixture', shellPath: process.env.WATCHDOG_TEST_PWSH, shellArgs: ['-NoLogo', '-NoProfile'] });
     const pid = await terminal.processId;
     const sample = await until(async () => { await api.sampleNow(); return api.getSnapshot().processes.find((p) => p.pid === pid); }, 'native terminal process', 30000);
     assert.ok(sample.privateBytes > 0); assert.ok(sample.workingSetBytes > 0);
@@ -29,8 +29,8 @@ exports.run = async () => {
     await vscode.commands.executeCommand('memoryWatchdog.dashboardView.focus');
     report.checks.push('The live editor dashboard opens and reuses one tab; the contributed activity-bar webview resolves.');
 
-    const config = vscode.workspace.getConfiguration('frenchexdev.powershellWatchdog');
-    await config.update('profile', 'build', vscode.ConfigurationTarget.Global);
+    const config = vscode.workspace.getConfiguration('frenchexdev.memoryWatchdog');
+    await config.update('workload', 'build', vscode.ConfigurationTarget.Global);
     await until(async () => { await api.sampleNow(); return api.getSnapshot().profile === 'build' && api.getSnapshot().processes.find((p) => p.pid === pid)?.thresholds.restartPrivateGiB === 64; }, 'profile configuration and fresh measurement');
     assert.equal(api.getSnapshot().health.consecutiveErrors, 0); assert.ok(api.getSnapshot().health.lastCompletedAt);
     report.checks.push('A real user-machine profile change reaches the controller, resets evidence and applies effective per-process thresholds.');

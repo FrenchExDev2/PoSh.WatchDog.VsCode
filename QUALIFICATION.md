@@ -1,3 +1,21 @@
+# Qualification — 0.6.0 — generic targets and persistent collection indicator
+
+Date: **10 November 2026**. Manifest, both root lockfile versions and the changelog agree on **0.6.0**. This section records local validation before the release commit and tag; Marketplace acceptance is verified separately after publication.
+
+**202 automated tests pass on Windows x64, with zero failures, cancellations or skips**, in approximately 11.6 seconds. ESLint passes across source and test JavaScript. The suite includes the generic-target and cross-platform parser fixtures, per-window ownership, configuration approvals, multi-target restart safeguards, packaging inventory, a ten-frame Braille rotation regression and a deterministic 512-step animation state-sequence check. Four targeted animation mutations (missing redraw, missing timer cleanup, inverted collection state and frozen frame) were independently detected in the focused development campaign.
+
+**Both offline Edge browser harnesses pass.** They exercise dashboard controls, target/workload thresholds and desktop/narrow layouts, and a report generated from nearly 15 MiB of retained history with escaping, pagination, gaps and partial measurements. No remote page request, JavaScript exception or CSP violation was observed by those harnesses.
+
+**All five source-integration scenario groups pass in VS Code Stable 1.144.0 on Windows x64.** They cover actual PowerShell process memory/CPU/thread/handle metrics and terminal association; dashboard tab reuse and activity-bar view creation; a real machine-level workload change using isolated target-config thresholds; observed shell activity transitioning from unknown to busy and idle; persistent history and HTML/JSON diagnostics without collected command text. The initial Desktop attempt exposed an obsolete 0.5.x fixture; the runner and driver now use the 0.6 settings namespace, workload selector and an isolated `pwsh-terminals.watchdog.json` override. The corrected run passes. A separate interactive development-host preview confirms the modified extension loads and measures a real terminal in notify-only mode.
+
+VSIX packaging passes, and archive inspection confirms version 0.6.0 and inclusion of `src/loading-spinner.js`. The packaging inventory regression checks that tests, sandbox directories, scripts and development dependencies are excluded. The final package and SHA-256 are retained under `dist/`; this is a local package, while the publishing workflow builds and hashes its own artifact for the tagged commit.
+
+Evidence: `.sandbox/release-0.6.0/` contains `Unit.log`, `Lint.log`, `Dashboard.log`, `Report.log`, `Desktop.log`, `Package.log`, their bounded QuietCli result envelopes and `summary.json`. The first Desktop failure is preserved as `Desktop-before-fix.log` and `first-attempt-summary.json`. Focused mutation evidence is in `.sandbox/snake-refresh/mutations.log` and the individual mutant directories. Tests ran in the background with a dedicated visible PowerShell monitor; reopen `.sandbox/release-0.6.0/monitor.ps1` to view the saved terminal state. The window closes automatically after completion.
+
+**Limits:** Linux, macOS and arm64 retain fixture-only coverage; they were not exercised on native hosts. This run uses the development sources rather than an installed VSIX. It does not requalify actual automatic Editor Services or third-party target restarts, nor uninterrupted native-hover visibility during status updates. The qualified Editor Services launch format remains ms-vscode.powershell 2026.1.2; unknown versions still fail closed for automatic association. No Marketplace upload or public availability is claimed by these local results.
+
+---
+
 # Qualification — 0.5.5 — audit corrections
 
 Date: **5 November 2026**. Manifest, lockfile and changelog prepare version 0.5.5. No tag or publication is created by this validation.
