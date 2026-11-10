@@ -2,7 +2,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveSession, candidateFromOptions } = require('../src/session');
+const session = require('../src/session');
+// The Windows fixtures stay valid on any test host because the platform is explicit.
+const resolveSession = (vscode) => session.resolveSession(vscode, { platform: 'win32' });
+const candidateFromOptions = (options, descriptor) => session.candidateFromOptions(options, descriptor, 'win32');
 
 const descriptor = { extensionPath: 'C:\\extensions\\powershell', logPath: 'C:\\logs\\window1\\powershell', storagePath: 'C:\\storage\\powershell' };
 function options(window = 1, suffix = '') {
@@ -51,4 +54,18 @@ test('unknown extension versions and unavailable PIDs are explicit failures', as
     return true;
   });
   await assert.rejects(resolveSession(host([{ creationOptions: options(), processId: Promise.resolve(undefined) }])), { code: 'unknown' });
+});
+
+test('Linux and macOS launch forms are recognized with case-sensitive POSIX paths', () => {
+  const posix = { extensionPath: '/home/u/.vscode/extensions/ms-vscode.powershell-2026.1.2', logPath: '/home/u/.config/Code/logs/w1/powershell',
+    storagePath: '/home/u/.config/Code/User/globalStorage/ms-vscode.powershell' };
+  const launch = (shellPath, logPath = posix.logPath) => ({ shellPath, shellArgs: ['-NoProfile', '-NonInteractive', '-Command',
+    `Import-Module '${posix.extensionPath}/modules/PowerShellEditorServices/PowerShellEditorServices.psd1'; Start-EditorServices -LogPath '${logPath}' -SessionDetailsPath '${posix.storagePath}/sessions/PSES-VSCode-1-2.json'`] });
+  for (const platform of ['linux', 'darwin']) {
+    const found = session.candidateFromOptions(launch('/usr/local/bin/pwsh'), posix, platform);
+    assert.equal(found?.sessionPath, `${posix.storagePath}/sessions/PSES-VSCode-1-2.json`, platform);
+    assert.equal(session.candidateFromOptions(launch('/usr/local/bin/pwsh', posix.logPath.toUpperCase()), posix, platform), null);
+    assert.equal(session.candidateFromOptions(launch('/usr/local/bin/pwsh-preview'), posix, platform), null);
+  }
+  assert.equal(session.candidateFromOptions(launch('/usr/bin/pwsh.exe'), posix, 'linux'), null);
 });

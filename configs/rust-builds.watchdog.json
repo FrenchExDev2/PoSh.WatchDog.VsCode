@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "rust-builds",
+  "label": "Rust builds",
+  "description": "cargo and rustc started from a terminal or by an extension. Alerts only.",
+  "match": { "processNames": ["cargo", "rustc"], "ownership": "child" },
+  "thresholds": { "warningPrivateGiB": 6, "actionPrivateGiB": 12, "consecutiveSamples": 3 },
+  "action": { "mode": "notifyOnly" }
+}

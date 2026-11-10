@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "python",
+  "label": "Python language server (Pylance)",
+  "description": "server.bundle.js of Pylance (ms-python.vscode-pylance). Restart command contributed by ms-python.python, verified in 2026.10.0. Large workspaces legitimately use several GiB.",
+  "match": { "processNames": ["*"], "ownership": "extensionHost", "commandLine": "[\\\\/]ms-python\\.vscode-pylance[^\\\\/]*[\\\\/]dist[\\\\/]server\\.bundle\\.js" },
+  "thresholds": { "warningPrivateGiB": 6, "actionPrivateGiB": 10, "consecutiveSamples": 3 },
+  "action": { "mode": "automatic", "restartCommand": "python.analysis.restartLanguageServer", "graceSeconds": 30, "cooldownSeconds": 300, "maxPerHour": 2, "timeoutSeconds": 90, "deferWhileDebugging": [], "deferWhileRunningCommands": false, "requireKnownIdle": false }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "pwsh-terminals",
+  "label": "PowerShell terminals",
+  "description": "pwsh processes that are the shell of an integrated terminal of this window.",
+  "match": { "processNames": ["pwsh"], "ownership": "terminal" },
+  "thresholds": { "warningPrivateGiB": 4, "actionPrivateGiB": 8, "consecutiveSamples": 3 },
+  "action": { "mode": "notifyOnly" }
+}

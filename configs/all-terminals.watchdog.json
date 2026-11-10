@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "all-terminals",
+  "label": "All terminal shells",
+  "description": "Every integrated terminal shell of this window, whatever the shell. Alerts only.",
+  "match": { "processNames": ["*"], "ownership": "terminal" },
+  "thresholds": { "warningPrivateGiB": 4, "actionPrivateGiB": 8, "consecutiveSamples": 3 },
+  "action": { "mode": "notifyOnly" }
+}

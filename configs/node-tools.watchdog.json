@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "node-tools",
+  "label": "Node.js tools",
+  "description": "node, bun and deno processes started from a terminal or by an extension: builds, test runners, dev servers. Alerts only: no command restarts an arbitrary build.",
+  "match": { "processNames": ["node", "bun", "deno"], "ownership": "child" },
+  "thresholds": { "warningPrivateGiB": 4, "actionPrivateGiB": 8, "consecutiveSamples": 3 },
+  "action": { "mode": "notifyOnly" }
+}

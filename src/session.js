@@ -1,6 +1,6 @@
 'use strict';
 
-const path = require('node:path');
+const { pathFor, normalizeName } = require('./platform');
 
 // Add a version only after qualifying its launch artifacts and window ownership checks.
 const qualifiedPowerShellVersions = Object.freeze(['2026.1.2']);
@@ -9,7 +9,11 @@ class WatchdogError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
 
-const normalizePath = (value) => path.win32.normalize(value).toLowerCase();
+// Paths compare case-insensitively only on Windows; POSIX file systems used by VS Code are case-sensitive by default.
+const normalizePath = (value, platform = process.platform) => {
+  const normalized = pathFor(platform).normalize(value);
+  return platform === 'win32' ? normalized.toLowerCase() : normalized;
+};
 
 function quotedArgument(command, name) {
   const matches = [...command.matchAll(new RegExp(`(?:^|\\s)-${name}\\s+'((?:[^']|'')*)'`, 'gi'))];
@@ -18,9 +22,11 @@ function quotedArgument(command, name) {
 
 // This adapter deliberately supports the launch form inspected in PowerShell 2026.1.2.
 // Unknown versions must be qualified before broadening the compatibility gate.
-function candidateFromOptions(options, extension) {
+function candidateFromOptions(options, extension, platform = process.platform) {
   if (!options || typeof options.shellPath !== 'string' || !Array.isArray(options.shellArgs)) return null;
-  if (path.win32.basename(options.shellPath).toLowerCase() !== 'pwsh.exe') return null;
+  const path = pathFor(platform);
+  const same = (left, right) => normalizePath(left, platform) === normalizePath(right, platform);
+  if (normalizeName(path.basename(options.shellPath), platform) !== 'pwsh') return null;
   const args = options.shellArgs;
   const commandIndex = args.findIndex((arg) => typeof arg === 'string' && arg.toLowerCase() === '-command');
   if (commandIndex < 0 || commandIndex !== args.length - 2) return null;
@@ -29,15 +35,15 @@ function candidateFromOptions(options, extension) {
   const modulePath = quotedArgument(command, 'Module');
   // Import-Module uses a positional path, not a named -Module parameter.
   const imported = /^Import-Module\s+'((?:[^']|'')*)';\s*Start-EditorServices\s/i.exec(command)?.[1]?.replace(/''/g, "'");
-  if (modulePath || !imported || normalizePath(imported) !== normalizePath(path.win32.join(extension.extensionPath, 'modules/PowerShellEditorServices/PowerShellEditorServices.psd1'))) return null;
+  if (modulePath || !imported || !same(imported, path.join(extension.extensionPath, 'modules', 'PowerShellEditorServices', 'PowerShellEditorServices.psd1'))) return null;
   const logPath = quotedArgument(command, 'LogPath');
   const sessionPath = quotedArgument(command, 'SessionDetailsPath');
-  if (!logPath || !sessionPath || normalizePath(logPath) !== normalizePath(extension.logPath)) return null;
-  if (normalizePath(path.win32.dirname(sessionPath)) !== normalizePath(path.win32.join(extension.storagePath, 'sessions')) || !/^PSES-VSCode-\d+-\d+\.json$/i.test(path.win32.basename(sessionPath))) return null;
+  if (!logPath || !sessionPath || !same(logPath, extension.logPath)) return null;
+  if (!same(path.dirname(sessionPath), path.join(extension.storagePath, 'sessions')) || !/^PSES-VSCode-\d+-\d+\.json$/i.test(path.basename(sessionPath))) return null;
   return { shellPath: options.shellPath, logPath, sessionPath };
 }
 
-async function resolveSession(vscode) {
+async function resolveSession(vscode, { platform = process.platform } = {}) {
   const installed = ['ms-vscode.powershell', 'ms-vscode.powershell-preview']
     .map((id) => vscode.extensions.getExtension(id)).filter((extension) => extension?.isActive);
   if (!installed.length) return { state: 'waiting', detail: 'Waiting for an already running PowerShell extension.' };
@@ -53,7 +59,7 @@ async function resolveSession(vscode) {
   if (logUri?.scheme !== 'file' || storageUri?.scheme !== 'file') throw new WatchdogError('unsupported', 'PowerShell session is not local.');
   const descriptor = { extensionPath: extension.extensionPath, logPath: logUri.fsPath, storagePath: storageUri.fsPath };
   const candidates = vscode.window.terminals.map((terminal) => ({
-    terminal, candidate: candidateFromOptions(terminal.creationOptions, descriptor),
+    terminal, candidate: candidateFromOptions(terminal.creationOptions, descriptor, platform),
   })).filter((entry) => entry.candidate);
   if (!candidates.length) return { state: 'waiting', detail: 'Waiting for a supported Editor Services terminal in this window.' };
   if (candidates.length !== 1) throw new WatchdogError('ambiguous', 'Multiple Editor Services terminals match this window.');

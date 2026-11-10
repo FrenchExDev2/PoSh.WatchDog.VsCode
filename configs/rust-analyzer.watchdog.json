@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "rust-analyzer",
+  "label": "rust-analyzer",
+  "description": "rust-analyzer started by rust-lang.rust-analyzer (verified in 0.3.3105). Ownership is the whole window so that a rustup proxy and its server count as two processes and keep the restart manual.",
+  "match": { "processNames": ["rust-analyzer"], "ownership": "window" },
+  "thresholds": { "warningPrivateGiB": 6, "actionPrivateGiB": 12, "consecutiveSamples": 3 },
+  "action": { "mode": "automatic", "restartCommand": "rust-analyzer.restartServer", "graceSeconds": 30, "cooldownSeconds": 300, "maxPerHour": 2, "timeoutSeconds": 90, "deferWhileDebugging": [], "deferWhileRunningCommands": false, "requireKnownIdle": false }
+}

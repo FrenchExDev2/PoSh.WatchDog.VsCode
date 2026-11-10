@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "pwsh-children",
+  "label": "PowerShell child processes",
+  "description": "pwsh processes started by a terminal or an extension of this window.",
+  "match": { "processNames": ["pwsh"], "ownership": "child" },
+  "thresholds": { "warningPrivateGiB": 4, "actionPrivateGiB": 8, "consecutiveSamples": 3 },
+  "action": { "mode": "notifyOnly" }
+}

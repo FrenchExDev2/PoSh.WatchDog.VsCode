@@ -5,7 +5,7 @@ function createReportPanel(vscode) {
   return {
     open(html) {
       if (!panel) {
-        panel = vscode.window.createWebviewPanel('powershellWatchdog.visualDiagnostics',
+        panel = vscode.window.createWebviewPanel('memoryWatchdog.visualDiagnostics',
           'Memory Watchdog · Visual diagnostics', vscode.ViewColumn.Active, {
             enableScripts: true, enableForms: false, enableCommandUris: false, localResourceRoots: [],
           });

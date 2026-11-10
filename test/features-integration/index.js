@@ -13,7 +13,7 @@ exports.run = async () => {
   try {
     const extension = vscode.extensions.getExtension('FrenchExDev.powershell-watchdog');
     assert.ok(extension); const api = await extension.activate();
-    terminal = vscode.window.createTerminal({ name: 'Watchdog 0.4 native fixture', shellPath: process.env.WATCHDOG_TEST_PWSH, shellArgs: ['-NoLogo', '-NoProfile'] });
+    terminal = vscode.window.createTerminal({ name: 'Watchdog native fixture', shellPath: process.env.WATCHDOG_TEST_PWSH, shellArgs: ['-NoLogo', '-NoProfile'] });
     const pid = await terminal.processId;
     const sample = await until(async () => { await api.sampleNow(); return api.getSnapshot().processes.find((p) => p.pid === pid); }, 'native terminal process', 30000);
     assert.ok(sample.privateBytes > 0); assert.ok(sample.workingSetBytes > 0);
@@ -22,15 +22,15 @@ exports.run = async () => {
     await until(async () => { await api.sampleNow(); return Number.isFinite(api.getSnapshot().processes.find((p) => p.pid === pid)?.cpuPercent); }, 'second native CPU observation');
     report.checks.push('Real Windows pwsh memory, parent PID, CPU delta, threads, handles and terminal association are measured.');
 
-    await vscode.commands.executeCommand('powershellWatchdog.dashboard');
+    await vscode.commands.executeCommand('memoryWatchdog.dashboard');
     await until(() => vscode.window.tabGroups.all.flatMap((group) => group.tabs).some((tab) => tab.input instanceof vscode.TabInputWebview && tab.label.includes('Watchdog')), 'dashboard tab creation');
-    await vscode.commands.executeCommand('powershellWatchdog.dashboard');
+    await vscode.commands.executeCommand('memoryWatchdog.dashboard');
     assert.equal(vscode.window.tabGroups.all.flatMap((group) => group.tabs).filter((tab) => tab.input instanceof vscode.TabInputWebview && tab.label.includes('Watchdog')).length, 1);
-    await vscode.commands.executeCommand('powershellWatchdog.dashboardView.focus');
+    await vscode.commands.executeCommand('memoryWatchdog.dashboardView.focus');
     report.checks.push('The live editor dashboard opens and reuses one tab; the contributed activity-bar webview resolves.');
 
-    const config = vscode.workspace.getConfiguration('frenchexdev.powershellWatchdog');
-    await config.update('profile', 'build', vscode.ConfigurationTarget.Global);
+    const config = vscode.workspace.getConfiguration('frenchexdev.memoryWatchdog');
+    await config.update('workload', 'build', vscode.ConfigurationTarget.Global);
     await until(async () => { await api.sampleNow(); return api.getSnapshot().profile === 'build' && api.getSnapshot().processes.find((p) => p.pid === pid)?.thresholds.restartPrivateGiB === 64; }, 'profile configuration and fresh measurement');
     assert.equal(api.getSnapshot().health.consecutiveErrors, 0); assert.ok(api.getSnapshot().health.lastCompletedAt);
     report.checks.push('A real user-machine profile change reaches the controller, resets evidence and applies effective per-process thresholds.');
@@ -49,11 +49,11 @@ exports.run = async () => {
     await until(async () => { await api.sampleNow(); return api.getSnapshot().processes.find((p) => p.pid === pid)?.activity.state === 'idle'; }, 'observed shell execution end', 15000);
     report.checks.push('Unknown activity is preserved without shell integration; actual VS Code execution signals report busy then idle after initializing the owned test shell.');
 
-    const uri = await vscode.commands.executeCommand('powershellWatchdog.visualDiagnostics');
+    const uri = await vscode.commands.executeCommand('memoryWatchdog.visualDiagnostics');
     const html = await fs.readFile(uri.fsPath, 'utf8');
     const data = JSON.parse(/<script id="report-data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1]);
     assert.ok(data.entries.some((entry) => entry.processes.some((p) => p.pid === pid)));
-    await vscode.commands.executeCommand('powershellWatchdog.diagnostics');
+    await vscode.commands.executeCommand('memoryWatchdog.diagnostics');
     await until(() => vscode.workspace.textDocuments.some((doc) => doc.languageId === 'json' && doc.getText().includes('automaticRestartBlockedBy')), 'JSON diagnostic document');
     const snapshot = api.getSnapshot();
     assert.ok(snapshot.history.some((entry) => entry.sessionId)); assert.equal(snapshot.journalError, null);

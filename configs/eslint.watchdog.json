@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/watchdog-config.schema.json",
+  "schemaVersion": 1,
+  "name": "eslint",
+  "label": "ESLint server",
+  "description": "eslintServer.js of the ESLint extension (dbaeumer.vscode-eslint), one per window. Restart command verified in vscode-eslint 3.0.34.",
+  "match": { "processNames": ["*"], "ownership": "extensionHost", "commandLine": "[\\\\/]dbaeumer\\.vscode-eslint[^\\\\/]*[\\\\/]server[\\\\/]out[\\\\/]eslintServer\\.js" },
+  "thresholds": { "warningPrivateGiB": 2, "actionPrivateGiB": 4, "consecutiveSamples": 3 },
+  "action": { "mode": "automatic", "restartCommand": "eslint.restart", "graceSeconds": 30, "cooldownSeconds": 300, "maxPerHour": 2, "timeoutSeconds": 60, "deferWhileDebugging": [], "deferWhileRunningCommands": false, "requireKnownIdle": false }
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FrenchExDev Memory Watchdog target config",
+  "description": "One monitored target per file. The file must be named <name>.watchdog.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "label", "thresholds"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$", "description": "Must equal the file name without .watchdog.json." },
+    "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 500 },
+    "adapter": { "enum": ["powershellEditorServices"], "description": "Code-bound process identification. When set, match is ignored." },
+    "scaleWithWorkload": { "type": "boolean", "default": true, "description": "Multiply thresholds by the workload factor (development x1, tests x1.5, build x2)." },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["processNames", "ownership"],
+      "properties": {
+        "processNames": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "type": "string", "pattern": "^(?:\\*|[^\\\\/]{1,128})$" },
+          "description": "Executable names without path; .exe is optional and case is ignored on Windows. [\"*\"] matches any name." },
+        "ownership": { "enum": ["terminal", "child", "extensionHost", "window"],
+          "description": "terminal: shell of an integrated terminal; child: descendant of a terminal or the extension host; extensionHost: direct child of the extension host; window: any process owned by this window." },
+        "commandLine": { "type": "string", "minLength": 1, "maxLength": 512, "description": "Case-insensitive regular expression tested against the command line (100 ms budget)." }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["warningPrivateGiB", "actionPrivateGiB"],
+      "properties": {
+        "warningPrivateGiB": { "type": "number", "minimum": 0.01, "maximum": 1024 },
+        "actionPrivateGiB": { "type": "number", "minimum": 0.01, "maximum": 1024, "description": "Must be greater than warningPrivateGiB." },
+        "consecutiveSamples": { "type": "integer", "minimum": 1, "maximum": 100, "default": 3 },
+        "growthWarningMiB": { "type": "number", "minimum": 1, "maximum": 1048576, "default": 500 },
+        "growthWindowSeconds": { "type": "number", "minimum": 1, "maximum": 86400, "default": 300 }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["automatic", "notifyOnly"], "default": "notifyOnly" },
+        "restartCommand": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,128}$", "description": "VS Code command run to restart the target. Automatic use from a user config requires approval." },
+        "graceSeconds": { "type": "number", "minimum": 0, "maximum": 3600, "default": 30 },
+        "cooldownSeconds": { "type": "number", "minimum": 1, "maximum": 86400, "default": 120 },
+        "maxPerHour": { "type": "integer", "minimum": 1, "maximum": 60, "default": 3 },
+        "timeoutSeconds": { "type": "number", "minimum": 1, "maximum": 600, "default": 45 },
+        "deferWhileDebugging": { "type": "array", "maxItems": 16, "items": { "type": "string" }, "description": "Debug session types that defer an automatic restart." },
+        "deferWhileRunningCommands": { "type": "boolean", "default": true },
+        "requireKnownIdle": { "type": "boolean", "default": false }
+      }
+    }
+  },
+  "anyOf": [{ "required": ["adapter"] }, { "required": ["match"] }]
+}

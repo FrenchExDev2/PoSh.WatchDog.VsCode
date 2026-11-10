@@ -47,34 +47,35 @@ async function main() {
       })()`), 'Gio labels stay readable, inside the chart and separate from one another.');
     };
     await post(snapshot);
-    assert.deepEqual(await axisLabels(), ['0 Gio', '4 Gio', '8 Gio', '12 Gio', '16 Gio']);
+    assert.equal(await evaluate('document.getElementById("show-profiles").checked'), false, 'Only the active workload is drawn by default.');
+    assert.deepEqual(await axisLabels(), ['0 GiB', '1 GiB', '2 GiB', '3 GiB', '4 GiB'], 'The scale follows the 2 GiB data and the near 4 GiB threshold, not 16 GiB.');
     await assertAxisVisible();
     assert.ok(await evaluate(`(()=>{
-      const tick=[...document.querySelectorAll('#chart [data-axis=memory]')].find(el=>el.textContent==='8 Gio');
-      const threshold=document.querySelector('#chart [data-profile=development][stroke-dasharray="10 5"]');
+      const tick=[...document.querySelectorAll('#chart [data-axis=memory]')].find(el=>el.textContent==='4 GiB');
+      const threshold=document.querySelector('#chart [data-profile=development][stroke-dasharray="3 5"]');
       return Number(tick.getAttribute('y'))===Number(threshold.getAttribute('y1'));
-    })()`), 'Thresholds and Gio ticks use the same scale.');
+    })()`), 'Thresholds and ticks use the same scale.');
+    assert.ok(await evaluate('document.getElementById("chart-legend").textContent.includes("development · terminal · high 8 GiB · active · above scale")'), 'A threshold far above the data is listed, not drawn.');
+    assert.equal(await evaluate('document.querySelectorAll("#chart [data-profile]").length'), 1);
     assert.equal(await evaluate('document.querySelectorAll("#inventory tr:not(:has(.group))").length'), 3);
     assert.equal(await evaluate('document.querySelectorAll("#inventory .group").length'), 2);
     assert.equal(await evaluate('document.querySelectorAll("#chart polyline").length'), 4, 'Both memory traces retain explicit collection gaps.');
-    assert.deepEqual(await evaluate('Array.from(new Set(Array.from(document.querySelectorAll("#chart [data-profile]"),el=>el.dataset.profile))).sort()'), ['build', 'development', 'tests']);
-    assert.ok(await evaluate('document.getElementById("chart-legend").textContent.includes("tests · terminal · high 12 GiB")'));
     await evaluate('document.getElementById("show-profiles").click()');
-    assert.equal(await evaluate('document.querySelectorAll("#chart [data-profile]").length'), 0);
-    assert.deepEqual(await axisLabels(), ['0 Gio', '0.5 Gio', '1 Gio', '1.5 Gio', '2 Gio']);
+    assert.deepEqual(await axisLabels(), ['0 GiB', '1 GiB', '2 GiB', '3 GiB', '4 GiB'], 'Other workloads do not flatten the traces.');
+    assert.ok(await evaluate('document.getElementById("chart-legend").textContent.includes("tests · terminal · high 12 GiB · above scale")'));
+    assert.equal(await evaluate('document.querySelectorAll("#chart-legend li").length'), 6);
     for (const bytes of [0, 0.375 * GiB, 32 * GiB]) {
       await post({ ...snapshot, history: [], processes: [{ ...processes[0], privateBytes: bytes, workingSetBytes: bytes / 2 }] });
       const labels = await axisLabels();
-      assert.equal(labels[0], '0 Gio');
-      assert.ok(Number.parseFloat(labels.at(-1)) >= bytes / GiB);
+      assert.match(labels[0], /^0 [MG]iB$/);
+      assert.ok(Number.parseFloat(labels.at(-1)) * (labels.at(-1).endsWith('GiB') ? GiB : 1024 ** 2) >= bytes);
       assert.ok(labels.length >= 2 && labels.length <= 6);
       await assertAxisVisible();
     }
     await post({ ...snapshot, processes: [], history: [] });
     assert.deepEqual(await axisLabels(), []);
     await post(snapshot);
-    await evaluate('document.getElementById("show-profiles").click();');
-    checks.push('Gio axis covers zero, fractional and large memory values, rescales without profiles and aligns thresholds with ticks.');
+    checks.push('Memory axis covers zero, MiB-scale and large values, keeps distant thresholds off-scale and aligns drawn thresholds with ticks.');
     assert.deepEqual(await evaluate('Array.from(document.getElementById("live-interval").options,o=>Number(o.value))'), [0, 2000, 5000]);
     assert.equal(await evaluate('document.querySelector("#live-controls label[for=live-interval]").textContent'), 'Refresh interval');
     assert.ok(await evaluate('document.getElementById("live-status").textContent.includes("off")'));
@@ -112,6 +113,61 @@ async function main() {
     assert.ok(await evaluate('document.querySelectorAll("#chart polyline").length>0'));
     assert.deepEqual(errors, []); assert.deepEqual(requests, []);
     checks.push('340px sidebar has no page overflow; failed collection clears current inventory while retaining history and health evidence; no script/CSP error or remote request.');
+    const MiB = 1024 ** 2;
+    const tagged = (pid, targetId, targetLabel, bytes, kind = 'child') => ({ ...sample(pid, kind, 99, 99, bytes), terminalName: '', targetId, targetLabel });
+    const multi = [tagged(11, 'pwsh-terminals', 'PowerShell terminals', 53 * MiB, 'terminal'), tagged(12, 'tsserver', 'TypeScript server', 410 * MiB),
+      tagged(13, 'csharp', 'C# <b>server</b>', 900 * MiB), tagged(14, 'fixed', 'Fixed', 120 * MiB)];
+    const multiHistory = Array.from({ length: 12 }, (_, i) => ({ at: new Date(now - (11 - i) * 15000).toISOString(), state: 'normal', decision: 'ok',
+      processes: multi.map((p) => ({ ...p, privateBytes: Math.round(p.privateBytes * (0.5 + i / 22)) })) }));
+    const configStatus = { profile: 'default', fallback: false, configs: [
+      { name: 'pwsh-terminals', label: 'PowerShell terminals', active: true, builtin: true, mode: 'notifyOnly', warningPrivateGiB: 4, actionPrivateGiB: 8, scaleWithWorkload: true, blockedBy: ['config is notify only'] },
+      { name: 'tsserver', label: 'TypeScript server', active: true, builtin: true, automatic: true, mode: 'automatic', restartCommand: 'typescript.restartTsServer', warningPrivateGiB: 2, actionPrivateGiB: 4, scaleWithWorkload: true },
+      { name: 'csharp', label: 'C# <img src=x onerror=globalThis.attacked=true>', active: true, needsApproval: true, mode: 'automatic', restartCommand: 'csharp.restart',
+        file: 'C:\\Users\\jean\\.frenchexdev\\memory-watchdog\\a-very-long-directory-name-that-must-wrap-inside-the-sidebar\\csharp.watchdog.json', overrides: 'built-in csharp', warningPrivateGiB: 4, actionPrivateGiB: 8 },
+      { name: 'fixed', label: 'Fixed', active: true, mode: 'notifyOnly', file: '/home/jean/.frenchexdev/memory-watchdog/fixed.watchdog.json', warningPrivateGiB: 0.1, actionPrivateGiB: 0.2, scaleWithWorkload: false },
+      { name: 'rust-analyzer', label: 'rust-analyzer', active: false, builtin: true }],
+    issues: [{ severity: 'error', file: '/home/jean/broken.watchdog.json', message: 'Invalid JSON </script><img src=x>' }], warnings: ['Profile "web" lists unknown config "nope".'] };
+    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1200, deviceScaleFactor: 1, mobile: false });
+    await post({ ...snapshot, state: 'normal', restartCountdown: null, processes: multi, history: multiHistory, profile: 'tests', configs: configStatus });
+    assert.equal(await evaluate('document.getElementById("profile").value'), 'tests');
+    assert.equal(await evaluate('document.getElementById("configs-section").hidden'), false);
+    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#configs tr"),r=>r.dataset.config)'), ['csharp', 'fixed', 'pwsh-terminals', 'tsserver', 'rust-analyzer']);
+    const status = (name) => evaluate(`document.querySelector('#configs [data-config="${name}"] td:nth-child(3)').textContent`);
+    assert.equal(await status('csharp'), 'active · needs approval');
+    assert.equal(await status('tsserver'), 'active · automatic');
+    assert.equal(await status('fixed'), 'active · notify only');
+    assert.equal(await status('pwsh-terminals'), 'active · notify only (config is notify only)');
+    assert.equal(await status('rust-analyzer'), 'available');
+    assert.ok(await evaluate('document.querySelector(\'#configs [data-config="csharp"] td:nth-child(5)\').textContent.endsWith("(overrides built-in csharp)")'));
+    assert.deepEqual(await evaluate('(()=>{const c=getComputedStyle(document.querySelector(\'#configs [data-config="csharp"] td:nth-child(5)\'));const r=getComputedStyle(document.querySelector(\'#configs [data-config="csharp"] td:nth-child(4)\'));return [c.textAlign,c.whiteSpace,r.textAlign]})()'), ['left', 'normal', 'left'], 'Configs are left aligned and long sources wrap.');
+    assert.ok(await evaluate('document.getElementById("config-issues").textContent.includes("error · /home/jean/broken.watchdog.json: Invalid JSON </script><img src=x>")'));
+    assert.ok(await evaluate('document.getElementById("config-issues").textContent.includes(\'warning · Profile "web" lists unknown config "nope".\')'));
+    assert.equal(await evaluate('typeof window.attacked'), 'undefined'); assert.equal(await evaluate('document.querySelectorAll("img").length'), 0);
+    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#inventory tr:not(:has(.group)) td:nth-child(2)"),td=>td.textContent).sort()'), ['C# <b>server</b>', 'Fixed', 'PowerShell terminals', 'TypeScript server']);
+    assert.deepEqual(await evaluate('Array.from(document.getElementById("kind").options,o=>o.value).filter(v=>v.startsWith("target:"))'), ['target:csharp', 'target:fixed', 'target:pwsh-terminals', 'target:tsserver']);
+    await evaluate('document.getElementById("kind").value="target:tsserver";document.getElementById("kind").dispatchEvent(new Event("change"));');
+    assert.equal(await evaluate('document.querySelectorAll("#inventory tr:not(:has(.group))").length'), 1);
+    await evaluate('document.getElementById("kind").value="";document.getElementById("kind").dispatchEvent(new Event("change"));');
+    if (!await evaluate('document.getElementById("show-profiles").checked')) await evaluate('document.getElementById("show-profiles").click()');
+    const choose = async (pid) => evaluate(`(()=>{const s=document.getElementById('process-select');s.value=[...s.options].find(o=>o.textContent.startsWith('PID ${pid} ·')).value;s.dispatchEvent(new Event('change'));return s.selectedOptions[0].textContent})()`);
+    assert.match(await choose(14), /^PID 14 · Fixed · /, 'The selector names the target.');
+    assert.equal((await axisLabels()).at(-1).endsWith('MiB'), true);
+    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#chart [data-profiles]"),el=>el.dataset.profiles)'), ['development tests build', 'development tests build'], 'Identical absolute thresholds are drawn once, not three times.');
+    assert.equal(await evaluate('document.querySelectorAll("#chart-legend li").length'), 2);
+    await choose(11);
+    assert.deepEqual(await axisLabels(), ['0 MiB', '20 MiB', '40 MiB', '60 MiB'], 'A 53 MiB shell gets a MiB scale.');
+    assert.equal(await evaluate('document.querySelectorAll("#chart [data-profile]").length'), 0);
+    assert.equal(await evaluate('document.querySelectorAll("#chart-legend li[data-offscale]").length'), 6);
+    assert.ok(await evaluate(`(()=>{const ys=[...document.querySelectorAll('#chart polyline[data-metric=privateBytes]')].flatMap(p=>p.getAttribute('points').split(' ').map(v=>Number(v.split(',')[1])));return Math.max(...ys)-Math.min(...ys)>50})()`), 'The private trace uses the plot height instead of lying on the axis.');
+    assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
+    await fs.writeFile(path.join(directory, 'multi-desktop.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));
+    await send('Emulation.setDeviceMetricsOverride', { width: 340, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await until(() => evaluate('Math.abs(document.getElementById("chart").viewBox.baseVal.width-document.getElementById("chart").clientWidth)<1'), 'responsive multi-target chart');
+    await assertAxisVisible();
+    assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'), 'Configs and Target columns stay inside their scroll areas at 340px.');
+    await fs.writeFile(path.join(directory, 'multi-sidebar.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));
+    assert.deepEqual(errors, []); assert.deepEqual(requests, []);
+    checks.push('Multi-target fixture: Configs section statuses, sources, issues and alignment, Target column and filter, target-named selector, deduplicated absolute thresholds, MiB scale with off-scale thresholds, hostile labels inert, no overflow at 1440px and 340px.');
     const adjustedHistory = history.map((entry) => ({ ...entry, warningPrivateGiB: 4, restartPrivateGiB: 8,
       processes: entry.processes.map((p) => ({ ...p, thresholds: p.pid === 1 ? { warningPrivateGiB: 2, restartPrivateGiB: 3 } : p.thresholds })) }));
     const report = path.join(directory, 'report.html');
@@ -119,12 +175,28 @@ async function main() {
     await send('Page.navigate', { url: pathToFileURL(report).href });
     await until(() => evaluate('document.documentElement.dataset.reportReady==="true"'), 'offline report');
     await evaluate(`document.getElementById('process-select').value=${JSON.stringify(`1:${processes[0].createdAt}`)};document.getElementById('process-select').dispatchEvent(new Event('change'));`);
-    assert.ok(await evaluate('Array.from(document.querySelectorAll("#memory-chart .axis")).some(el=>el.textContent==="3.36")'));
+    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#memory-chart .axis"),el=>el.textContent).slice(0,5)'), ['0', '1', '2', '3', 'GiB'], 'Report axis: round ticks up to the process own 3 GiB high threshold.');
+    assert.ok(await evaluate('document.querySelector("#memory-chart .restart-line")?.getAttribute("d").includes("M ")'));
     assert.ok(await evaluate('document.getElementById("quality").textContent.includes("workspace across sessions")'));
     assert.deepEqual(errors, []); assert.deepEqual(requests, []);
     checks.push('Offline report uses the selected process absolute thresholds and explains workspace history scope.');
+    // 23:58 → 00:02 in Paris (22:58Z → 23:02Z in winter): time-of-day labels alone would be ambiguous, so they carry the date.
+    await send('Emulation.setTimezoneOverride', { timezoneId: 'Europe/Paris' });
+    const midnight = Date.parse('2026-11-09T22:58:00Z');
+    const crossing = Array.from({ length: 17 }, (_, i) => ({ at: new Date(midnight + i * 15000).toISOString(), state: 'normal', decision: 'ok', sampleIntervalSeconds: 15,
+      processes: [{ ...processes[0], privateBytes: GiB }] }));
+    const midnightReport = path.join(directory, 'report-midnight.html');
+    await fs.writeFile(midnightReport, renderReportHtml(buildReportModel({ snapshot: { ...snapshot, processes: [], history: crossing } })), 'utf8');
+    await send('Page.navigate', { url: pathToFileURL(midnightReport).href });
+    await until(() => evaluate('document.documentElement.dataset.reportReady==="true"'), 'midnight report');
+    assert.ok(await evaluate('document.getElementById("subtitle").textContent.startsWith("Times in Europe/Paris · ")'));
+    assert.ok(await evaluate(`(()=>{const labels=[...document.querySelectorAll('#memory-chart text[y="365"]')].map(el=>el.textContent);
+      const withDate=new Date(${midnight}).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      return labels.length===5 && labels[0]===withDate && labels[0]!==new Date(${midnight}).toLocaleTimeString();})()`), 'Labels crossing local midnight include the date.');
+    assert.deepEqual(errors, []); assert.deepEqual(requests, []);
+    checks.push('Offline report names its time zone and dates time labels when the range crosses local midnight (Europe/Paris).');
   });
-  const result = { success: true, directory, checks, screenshots: ['desktop.png', 'sidebar.png'] };
+  const result = { success: true, directory, checks, screenshots: ['desktop.png', 'sidebar.png', 'multi-desktop.png', 'multi-sidebar.png'] };
   await fs.mkdir(path.join(root, 'verification'), { recursive: true });
   await fs.writeFile(path.join(root, 'verification/dashboard-browser.json'), JSON.stringify(result, null, 2), 'utf8');
   console.log(JSON.stringify(result));
