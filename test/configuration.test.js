@@ -53,8 +53,14 @@ test('new values win, old values are honored until migration, and workspace valu
   assert.deepEqual(validatePolicy(policy), []);
 });
 
+test('the manifest and both root lock entries agree on a stable release version', () => {
+  const lock = require('../package-lock.json');
+  assert.match(manifest.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
+  assert.equal(lock.version, manifest.version);
+  assert.equal(lock.packages[''].version, manifest.version);
+});
+
 test('the manifest contributes new ids, the config schema and limited untrusted support', () => {
-  assert.equal(manifest.version, '0.6.0');
   assert.ok(manifest.contributes.commands.every((command) => command.command.startsWith('memoryWatchdog.')));
   assert.deepEqual(manifest.contributes.jsonValidation, [{ fileMatch: '*.watchdog.json', url: './schemas/watchdog-config.schema.json' }]);
   assert.equal(manifest.capabilities.untrustedWorkspaces.supported, 'limited');

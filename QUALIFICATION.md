@@ -1,3 +1,15 @@
+# Qualification — 0.6.1 — patch release
+
+Date: **20 November 2026**. The manifest, both root lockfile entries, and the changelog agree on **0.6.1**. Runtime code and dependencies are unchanged.
+
+**203 automated tests pass on Windows x64 with Node 26.12.1**, with zero failures, skips or cancellations. ESLint passes. The version check now requires a stable version and agreement across the manifest and both root lockfile fields. The first pass exposed an assertion fixed to 0.6.0. The full suite passed after replacing it.
+
+**Both offline Edge harnesses and all five VS Code Stable 1.144.0 source-integration scenarios pass.** These checks cover the dashboard, a near-15-MiB report, real PowerShell process measurements and terminal association, workload changes, shell activity, and history and diagnostics. VSIX packaging passes. Archive inspection confirms the extension ID, version 0.6.1, and the presence of the status-bar spinner.
+
+Evidence is retained locally in `.sandbox/release-0.6.1/`, including `state.json` and the first failing run. Linux, macOS and arm64 coverage remains fixture-only. Installed-VSIX behavior, actual automatic restarts and Marketplace availability were outside this local validation.
+
+---
+
 # Qualification — 0.6.0 — generic targets and persistent collection indicator
 
 Date: **10 November 2026**. Manifest, both root lockfile versions and the changelog agree on **0.6.0**. This section records local validation before the release commit and tag; Marketplace acceptance is verified separately after publication.

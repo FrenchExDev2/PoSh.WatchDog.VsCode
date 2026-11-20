@@ -14,7 +14,7 @@ Independent project, not affiliated with or endorsed by Microsoft. Released unde
 
 ## Install
 
-Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.6.0.vsix`, then reload the window if upgrading. When upgrading from 0.5.x, Watchdog offers once to migrate your settings (see [Migration from 0.5.x](#migration-from-05x)).
+Use **Extensions: Install from VSIX…** to install `dist/powershell-watchdog-0.6.1.vsix`, then reload the window if upgrading. When upgrading from 0.5.x, Watchdog offers once to migrate your settings (see [Migration from 0.5.x](#migration-from-05x)).
 
 Requires **VS Code 1.114+** (Stable or Insiders) on a local Desktop window. On Windows the collector uses PowerShell 7 (`pwsh` from `PATH`) and falls back to the built-in Windows PowerShell 5.1; Linux and macOS need nothing extra. Monitoring needs neither the Microsoft PowerShell extension nor an open `.ps1` file.
 

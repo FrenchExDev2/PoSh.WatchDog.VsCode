@@ -2,7 +2,7 @@
   "name": "powershell-watchdog",
   "displayName": "FrenchExDev Memory Watchdog",
   "description": "Per-window memory watchdog for VS Code on Windows, Linux and macOS: monitors the processes of this window (terminals, language servers, tools) through config files and profiles, alerts on high memory, and restarts a target only through its own command.",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "publisher": "FrenchExDev",
   "repository": {
     "type": "git",

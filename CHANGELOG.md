@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 — 2026-11-20
+
+- Bump the extension manifest and both root lockfile entries to 0.6.1. The extension runtime and dependencies are unchanged.
+- Update the local VSIX installation example to 0.6.1.
+- Check that the manifest and both root lockfile entries agree on a stable version in the automated suite.
+- Record validation of the release in QUALIFICATION.md.
+
 ## 0.6.0 — 2026-11-10
 
 - Replace the normal status-bar Monitoring label with a persistent single-cell Braille loading indicator. Animate only during actual process collection, preserve the last frame between collections and keep explicit warning, disabled, suspended and error labels. Stop the animation on collection completion, failure and extension disposal without rewriting unchanged hover content.
